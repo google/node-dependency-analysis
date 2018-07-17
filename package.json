@@ -1,0 +1,27 @@
+{
+  "name": "node-dependency-analysis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "acorn": "^5.7.1",
+    "node": "^10.6.0"
+  },
+  "devDependencies": {
+    "gts": "^0.7.1",
+    "typescript": "~2.8.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "check": "gts check",
+    "clean": "gts clean",
+    "compile": "tsc -p .",
+    "fix": "gts fix",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile",
+    "posttest": "npm run check"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
