@@ -1,2 +1,7 @@
 node_modules/*
 .clang-format
+build/*
+npm-debug.log
+.vscode
+.DS_Store
+.nyc_output
