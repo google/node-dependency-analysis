@@ -1,9 +1,8 @@
 import test from 'ava';
-
 import * as search from '../src/search';
 
 test(
-    'searchValue should have http module in standard require' +
+    'searchValue should have http module in standard require ' + 
         'http case',
     async t => {
       const content = 'const a = require(\'http\');';
@@ -20,7 +19,7 @@ test(
 
       const content2 = 'const a = \'require(\\\'http\\\')\';';
       const result2 = await search.search(content2);
-      t.deepEqual(result2.dynamicEvals.length, 0);
+      t.deepEqual(result2.dynamicArgs.length, 0);
       t.deepEqual(result2.requiredModules.size, 0);
     });
 
@@ -65,34 +64,65 @@ test('line number is accurate for search', async t => {
 });
 
 test(
-    'search function should return correct dynamic eval position with ' +
+    'search function should return correct dynamic arg position with ' + 
         'require arg as a concatenation of strings that forms http',
     async t => {
       const content = 'const a = require(\'h\' + \'t\' + \'t\' + \'p\');';
       const result = await search.search(content);
-      t.deepEqual(result.dynamicEvals[0].lineStart, 1);
+      t.deepEqual(result.dynamicArgs[0].lineStart, 1);
     });
 
 test(
-    'search function should return correct dynamic eval position with ' +
+    'search function should return correct dynamic arg position with ' + 
         'require arg as a substring that forms http',
     async t => {
       const content1 =
           `const a = \'anotherhttp\'\nconst b = require(a.substring(6));`;
       const result1 = await search.search(content1);
-      t.deepEqual(result1.dynamicEvals[0].lineStart, 2);
+      t.deepEqual(result1.dynamicArgs[0].lineStart, 2);
 
       const content2 = 'const a = require(\'anotherhttp\'.substring(6))';
       const result2 = await search.search(content2);
-      t.deepEqual(result2.dynamicEvals[0].lineStart, 1);
+      t.deepEqual(result2.dynamicArgs[0].lineStart, 1);
     });
 
 test(
-    'search function should return correct dynamic eval position with ' +
+    'search function should return correct dynamic arg position with ' + 
         'require arg as a function that returns http',
     async t => {
       const content =
           'function returnHttp(){return \'http\';}\nconst a = require(returnHttp);';
       const result = await search.search(content);
-      t.deepEqual(result.dynamicEvals[0].lineStart, 2);
+      t.deepEqual(result.dynamicArgs[0].lineStart, 2);
+    });
+
+test(
+    'search function should return dynamic require position where require callee ' + 
+        'is defined as a variable',
+    async t => {
+      const content1 = `function something(){ return 1;}
+                        const a = require; 
+                        const b = a(\'https\');`;
+      const result1 = await search.search(content1);
+      t.deepEqual(result1.dynamicRequire[0].lineStart, 2);
+    });
+
+test(
+    'search function should return correct dynamic arg position where require ' + 
+        'identifier is returned in a function',
+    async t => {
+      const content =
+          'function returnRequire(){return require;}\n const a = returnRequire();\nconst b = a(\'http\');';
+      const result = await search.search(content);
+      t.deepEqual(result.dynamicRequire[0].lineStart, 1);
+    });
+
+test(
+    'search function should return correct dynamic arg position where require ' + 
+        'identifier is passed as a parameter in a function',
+    async t => {
+      const content =
+          'function f(a, b){return a(b)}\nconst a = f(require, \'http\');';
+      const result = await search.search(content);
+      t.deepEqual(result.dynamicRequire[0].lineStart, 2);
     });

@@ -8,10 +8,10 @@
     "node": "^10.6.0"
   },
   "devDependencies": {
-    "ava": "^0.25.0",
     "@types/acorn": "^4.0.3",
     "@types/estree": "0.0.39",
     "@types/node": "^10.5.2",
+    "ava": "^0.25.0",
     "gts": "^0.7.1",
     "typescript": "~2.8.0"
   },
