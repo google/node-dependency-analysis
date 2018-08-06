@@ -1,7 +1,14 @@
-interface PointOfInterest {
+export interface PointOfInterest {
   type: string;
-  filename: string;
-  lineNum: number;
+  fileName: string;
+  position: Position;
+}
+
+export interface Position {
+  lineStart: number;
+  lineEnd: number;
+  colStart: number;
+  colEnd: number;
 }
 
 export interface PackageTree {
@@ -26,7 +33,7 @@ function getPOIforPackageTree(packageTree: PackageTree): PackageTree {
   // step 2: add POI to PackageTree Object
 }
 
-function getPackagePOIList(package: PackageTree): PointOfInterest[] {
+function getPackagePOIList(pkg: PackageTree): PointOfInterest[] {
   // TODO:
   // calls getPointsOfInterest for each file in package
   throw new Error('not implemented');
@@ -35,13 +42,13 @@ function getPackagePOIList(package: PackageTree): PointOfInterest[] {
 // Gets Points of Interest for a single file
 function getPointsOfInterest(
     contents: string, fileName: string,
-    functionArray: POIDetector[]): PointOfInterest[] {
-  // TODO:
-  throw new Error('not implemented');
-
-  // const pointsOfInterest: PointOfInterest[] = [];
-  // functionArray.forEach((f)=> pointsOfInterest.push(...f(contents,
-  // fileName))); return pointsOfInterest;
+    functionArray: Function[]): PointOfInterest[] {
+  const pointsOfInterest: PointOfInterest[] = [];
+  functionArray.forEach((f) => {
+    const subList = f(contents, fileName);
+    pointsOfInterest.push(subList);
+  });
+  return pointsOfInterest;
 }
 
 function main() {
