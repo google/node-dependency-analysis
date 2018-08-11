@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "acorn": "^5.7.1",
-    "node": "^10.6.0"
+    "node": "^10.6.0",
+    "pify": "^3.0.0"
   },
   "devDependencies": {
     "@types/acorn": "^4.0.3",
