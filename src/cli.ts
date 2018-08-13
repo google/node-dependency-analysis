@@ -3,7 +3,7 @@ import meow from 'meow';
 import pify from 'pify';
 
 import {outputToUser} from './output';
-import {generatePackageTree} from './package-tree';
+import {generatePackageTree, populatePOIInPackageTree, resolvePaths} from './package-tree';
 
 const cli = meow({
   help: `  
@@ -57,8 +57,12 @@ async function run(packageRootDir: string) {
   const pJson = await pify(fs.readFile)('package.json');
 
   // Step 3: create package tree - generatePackageTree or main function
-  const packageTree = generatePackageTree(pJson);
+  const emptyPackageTree = await generatePackageTree(pJson);
+  const packageTreeWithPath = await resolvePaths(emptyPackageTree, '.');
+  const packageTreeWithPOI =
+      await populatePOIInPackageTree(packageTreeWithPath);
 
   // Step 4: output
-  outputToUser(packageTree);
+  // TODO: Uncomment this line.
+  outputToUser(packageTreeWithPOI);
 }

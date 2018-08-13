@@ -6,12 +6,12 @@ import test from 'ava';
 import path from 'path';
 
 import * as tree from '../src/package-tree';
-import {PackageTree} from '../src/package-tree';
+import {generatePackageTree, getPackageTreeFromDependencyList, PackageTree} from '../src/package-tree';
 
 import * as tests from './mock-projects';
 
 test(
-    'the data property of the package tree should changed from null ' +
+    'the data property of the package tree should changed from undefined ' +
         'to an array of Points of Interest',
     async t => {
       // See how the dependency graph looks in test-projects
@@ -22,7 +22,7 @@ test(
       const b1 = {name: 'b', version: '1.0.0', data: null, dependencies: [c1]};
       const a1 =
           {name: 'a', version: '1.0.0', data: null, dependencies: [b1, c1]};
-      const root =
+      const root: PackageTree =
           {name: 'root', version: '1.0.0', data: null, dependencies: [a1, c2]};
 
       const resolvedTree: PackageTree<string> =
@@ -71,3 +71,121 @@ function sortByName(a: PackageTree<string>, b: PackageTree<string>) {
     return 1;
   }
 }
+
+test(
+    'getPackageTreeFromDependencyList should return a PackageTree array',
+    async t => {
+      const dependencies = {module1: 'version1', module2: 'version2'};
+      const packageLock = {
+        dependencies: {
+          module1: {requires: {module5: 'version5'}},
+          module2: {requires: {module6: 'version6'}},
+          module3: {requires: {module4: 'version4'}},
+          module4: {},
+          module5: {},
+          module6: {}
+        }
+      };
+      const result =
+          await getPackageTreeFromDependencyList(dependencies, packageLock);
+      const expectedResult = [
+        {
+          name: 'module1',
+          version: 'version1',
+          data: null,
+          dependencies: [{
+            name: 'module5',
+            version: 'version5',
+            data: null,
+            dependencies: []
+          }]
+        },
+
+        {
+          name: 'module2',
+          version: 'version2',
+          data: null,
+          dependencies: [{
+            name: 'module6',
+            version: 'version6',
+            data: null,
+            dependencies: []
+          }]
+        }
+      ];
+      t.deepEqual(result, expectedResult);
+    });
+
+test(
+    'generatePackageTree should return a populated PackageTree given a project name and its root directory',
+    async t => {
+      const pkgJson = {
+        name: 'testProject',
+        version: '1.0.0',
+        dependencies: {
+          module1: 'version1',
+        },
+        devDependencies: {module2: 'version2'}
+      };
+      const packageLock = {
+        dependencies: {
+          module1: {requires: {module5: 'version5'}},
+          module2: {requires: {module6: 'version6'}},
+          module3: {requires: {module4: 'version4'}},
+          module4: {},
+          module5: {},
+          module6: {}
+        }
+      };
+      async function fakeReadFilep(filepath: string): Promise<string> {
+        if (filepath === 'package.json') {
+          return JSON.stringify(pkgJson);
+        }
+        if (filepath === 'package-lock.json') {
+          return JSON.stringify(packageLock);
+        }
+        throw new Error('File Not Found');
+      }
+      const result = await generatePackageTree('.', fakeReadFilep);
+      const expectedResult = {
+        name: 'testProject',
+        version: '1.0.0',
+        data: null,
+        dependencies: [
+          {
+            name: 'module1',
+            version: 'version1',
+            data: null,
+            dependencies: [{
+              name: 'module5',
+              version: 'version5',
+              data: null,
+              dependencies: []
+            }]
+          },
+
+          {
+            name: 'module2',
+            version: 'version2',
+            data: null,
+            dependencies: [{
+              name: 'module6',
+              version: 'version6',
+              data: null,
+              dependencies: []
+            }]
+          }
+        ]
+      };
+      t.deepEqual(result, expectedResult);
+    });
+test(
+    'generatePackageTree throws an error if it can not find a file',
+    async t => {
+      const fakeReadFilep = () => {
+        throw new Error('File Not Found');
+      };
+
+      await t.throws(
+          generatePackageTree('.', fakeReadFilep), Error, 'File Not Found');
+    });
