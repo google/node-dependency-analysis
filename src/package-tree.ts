@@ -23,7 +23,8 @@ export interface PackageTree<T> {
   dependencies: Array<PackageTree<T>>;
 }
 
-function generatePackageTree(pjson: string): PackageTree<PointOfInterest[]> {
+export function generatePackageTree(pjson: string):
+    PackageTree<PointOfInterest[]> {
   throw new Error('not implemented');
   // compute result
   //   let result: PackageTree;
