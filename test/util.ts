@@ -1,5 +1,6 @@
 import execa from 'execa';
 import * as fs from 'fs';
+import {join} from 'path';
 import pify from 'pify';
 import * as tmp from 'tmp';
 
@@ -41,7 +42,6 @@ export type DependencyGraph = {
  * directory suitable for testing purposes.
  */
 export class TestProject {
-  private creatingProject: Promise<string> = Promise.resolve('');
   private cleanupCallbacks: Array<() => void> = [];
   private packageJsons: PackageJson[];
   private topLevelDependencies: string[];
@@ -72,7 +72,8 @@ export class TestProject {
                                 dependencies: graph[key].reduce(
                                     (acc, dep) => {
                                       const dependencyDetails = NVT.parse(dep);
-                                      acc[dependencyDetails.name] = `../${dep}`;
+                                      acc[dependencyDetails.name] =
+                                          join('..', dep);
                                       return acc;
                                     },
                                     {} as {
@@ -101,58 +102,53 @@ export class TestProject {
    * 2. Return /path/to/tmp/dir
    */
   async create(): Promise<string> {
-    await this.creatingProject;
-    this.creatingProject = new Promise<string>((resolve, reject) => {
-                             tmp.dir(
-                                 {unsafeCleanup: true, keep: true},
-                                 (err, path, cleanupCallback) => {
-                                   if (err) {
-                                     reject(err);
-                                     return;
-                                   }
-                                   this.cleanupCallbacks.push(cleanupCallback);
-                                   resolve(path);
-                                 });
-                           }).then(async path => {
-      await Promise.all(this.packageJsons.map(async pJson => {
-        const dirname = `${path}/${NVT.stringify(pJson)}`;
-        await mkdirP(dirname);
-        await writeFileP(
-            `${dirname}/package.json`, JSON.stringify(pJson, null, 2));
-        await writeFileP(
-            `${dirname}/index.js`,
-            `module.exports = '${pJson.name}@${pJson.version}';`);
-      }));
-      // main package.json file
-      await writeFileP(
-          `${path}/package.json`,
-          JSON.stringify(
-              {
-                name: 'test-project',
-                version: '0.0.0',
-                dependencies: this.topLevelDependencies.reduce(
-                    (acc, dep) => {
-                      const dependencyDetails = NVT.parse(dep);
-                      acc[dependencyDetails.name] = `./${dep}`;
-                      return acc;
-                    },
-                    {} as {
-                      [key: string]: string;
-                    })
-              },
-              null, 2));
-      await execa('npm', ['install'], {cwd: path});
-      return path;
+    const path = await new Promise<string>((resolve, reject) => {
+      tmp.dir(
+          {unsafeCleanup: true, keep: true}, (err, path, cleanupCallback) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            this.cleanupCallbacks.push(cleanupCallback);
+            resolve(path);
+          });
     });
-    return await this.creatingProject;
+    await Promise.all(this.packageJsons.map(async pJson => {
+      const dirname = join(path, NVT.stringify(pJson));
+      await mkdirP(dirname);
+      await writeFileP(
+          join(dirname, 'package.json'), JSON.stringify(pJson, null, 2));
+      await writeFileP(
+          join(dirname, 'index.js'),
+          `module.exports = '${pJson.name}@${pJson.version}';`);
+    }));
+    // main package.json file
+    await writeFileP(
+        join(path, 'package.json'),
+        JSON.stringify(
+            {
+              name: 'test-project',
+              version: '0.0.0',
+              dependencies: this.topLevelDependencies.reduce(
+                  (acc, dep) => {
+                    const dependencyDetails = NVT.parse(dep);
+                    // join() eliminates dot here, so use string interp.
+                    acc[dependencyDetails.name] = `./${dep}`;
+                    return acc;
+                  },
+                  {} as {
+                    [key: string]: string;
+                  })
+            },
+            null, 2));
+    await execa('npm', ['install'], {cwd: path});
+    return path;
   }
 
   /**
    * Cleans up all previous test projects created from this instance.
    */
   async cleanup(): Promise<void> {
-    await this.creatingProject;
-    await this.creatingProject;  // for good measure
     this.cleanupCallbacks.map(f => f());
     this.cleanupCallbacks.length = 0;
   }
