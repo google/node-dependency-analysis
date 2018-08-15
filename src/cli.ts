@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-import * as fs from 'fs';
 import meow from 'meow';
-import pify from 'pify';
 
 import {outputToUser} from './output';
-import {generatePackageTree, populatePOIInPackageTree, resolvePaths} from './package-tree';
+import * as tree from './package-tree';
+import * as util from './util';
 
 const cli = meow({
   help: `  
     Usage
-      $ TODO <project>
+      node-dependency-analysis [project-Directory]
  
     Options
       --help        Prints this help message.
@@ -41,20 +40,17 @@ if (cli.input.length !== 1) {
 }
 
 async function validNodePackage(path: string) {
-  try {
-    await pify(fs.stat)(path);
-  } catch (err) {
-    console.error(err);
+  if (!util.exists(path)) {
     cli.showHelp(1);
     return false;
   }
-  const fileInfo = await pify(fs.stat)(path);
-  if (!fileInfo.isDirectory()) {
+
+  if (!(await util.stat(path)).isDirectory()) {
     console.error(`Error: argument must be a directory`);
     cli.showHelp(1);
     return false;
   }
-  const files: string[] = await pify(fs.readdir)(path);
+  const files: string[] = await util.readdir(path);
   if (!files.includes('package.json')) {
     console.error(`Error: directory does not contain a package.json file`);
     cli.showHelp(1);
@@ -69,14 +65,12 @@ async function run(packageRootDir: string) {
     process.exit(1);
   }
 
-  // Step 2: Read package.json
-  const pJson = await pify(fs.readFile)('package.json');
-
   // Step 3: create package tree - generatePackageTree or main function
-  const emptyPackageTree = await generatePackageTree(pJson);
-  const packageTreeWithPath = await resolvePaths(emptyPackageTree, '.');
+  const emptyPackageTree = await tree.generatePackageTree(packageRootDir);
+  const packageTreeWithPath =
+      await tree.resolvePaths(emptyPackageTree, packageRootDir);
   const packageTreeWithPOI =
-      await populatePOIInPackageTree(packageTreeWithPath);
+      await tree.populatePOIInPackageTree(packageTreeWithPath);
 
   // Step 4: output
   // TODO: Uncomment this line.

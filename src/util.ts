@@ -14,9 +14,23 @@
  * limitations under the License.
  */
 
+import {ENOENT} from 'constants';
 import fs from 'fs';
 import pify from 'pify';
 
-export const filesInDir = pify(fs.readdir);
+export const readdir = pify(fs.readdir);
 export const readFile = pify(fs.readFile);
-export const fileInfo = pify(fs.stat);
+export const stat = pify(fs.stat);
+
+export async function exists(file: string) {
+  try {
+    await stat(file);
+  } catch (err) {
+    if (err === ENOENT) {
+      return false;
+    } else {
+      throw err;
+    }
+  }
+  return true;
+}

@@ -13,15 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import * as fs from 'fs';
 import * as path from 'path';
-import pify from 'pify';
 
 import {getDynamicEval, getIOModules} from './analysis';
-import {fileInfo, filesInDir, readFile} from './util';
-
-export const readFilep = pify(fs.readFile);
+import * as util from './util';
 
 export interface ReadFileP {
   (path: string, encoding: string): Promise<string>;
@@ -51,9 +46,8 @@ export interface PackageTree<T = null> {
  * Takes in the root directory of a project and returns returns a PackageTree
  */
 export async function generatePackageTree(
-    rootDir: string, customReadFilep?: ReadFileP): Promise<PackageTree> {
-  customReadFilep = customReadFilep || readFilep;
-
+    rootDir: string,
+    customReadFilep: ReadFileP = util.readFile): Promise<PackageTree<null>> {
   // Step 0: read in package.json and package-lock.json
   const pjsonPath = path.join(rootDir, 'package.json');
   const pjson = await customReadFilep(pjsonPath, 'utf8');
@@ -125,7 +119,7 @@ export async function getPackagePOIList(path: string):
   const files = await getJSFiles(path);
 
   await Promise.all(files.map(async (file) => {
-    const content = await readFile(file, 'utf8');
+    const content = await util.readFile(file, 'utf8');
     const functionArr: Function[] = [getIOModules, getDynamicEval];
     const filePOIList = getPointsOfInterest(content, file, functionArr);
     packagePOIList.push(...filePOIList);
@@ -166,35 +160,50 @@ export async function resolvePaths(
       packageNode: PackageTree, parentPath: string,
       updatedNodesMap: Map<string, PackageTree<string>>):
       Promise<PackageTree<string>> {
-    const paths: string[] = [];
     const resolvedNodes: Array<PackageTree<string>> = [];
 
-    paths.push(parentPath);
-    let currPath = path.dirname(require.resolve(packageNode.name, {paths}));
-
-    while (!(await filesInDir(currPath)).includes('package.json')) {
-      currPath = path.dirname(require.resolve(packageNode.name, {paths}));
-    }
-
+    const path: string = await findPath(packageNode.name, parentPath);
     await Promise.all(packageNode.dependencies.map(async (child) => {
-      resolvedNodes.push(
-          await resolvePathsRec(child, currPath, updatedNodesMap));
+      resolvedNodes.push(await resolvePathsRec(child, path, updatedNodesMap));
     }));
 
     // creates new node if node doesn't exist already
-    if (!updatedNodesMap.has(currPath)) {
+    if (!updatedNodesMap.has(path)) {
       const updatedNode: PackageTree<string> = {
         name: packageNode.name,
         version: packageNode.version,
-        data: currPath,
+        data: path,
         dependencies: resolvedNodes
       };
-      updatedNodesMap.set(currPath, updatedNode);
+      updatedNodesMap.set(path, updatedNode);
       return updatedNode;
     } else {
-      return updatedNodesMap.get(currPath)!;
+      return updatedNodesMap.get(path)!;
     }
   }
+}
+
+/**
+ * Gets the package path based on the location of the parent package
+ *
+ * @param mod the package/module
+ * @param parentPath the path of the parent package that depends on mod
+ */
+export async function findPath(
+    mod: string, parentPath: string): Promise<string> {
+  const moduleFolder = path.join(parentPath, 'node_modules');
+  if ((await util.exists(moduleFolder)) &&
+      (await util.stat(moduleFolder)).isDirectory()) {
+    const filesInFolder = await util.readdir(moduleFolder);
+    if (filesInFolder.includes(mod)) {
+      return path.join(moduleFolder, mod);
+    }
+  }
+  let currPath = path.dirname(parentPath);
+  while (!(await util.readdir(currPath)).includes('package.json')) {
+    currPath = path.dirname(currPath);
+  }
+  return findPath(mod, currPath);
 }
 
 /**
@@ -203,7 +212,7 @@ export async function resolvePaths(
  * @param path the package's directory path
  */
 export async function getJSFiles(dirPath: string): Promise<string[]> {
-  const topLevelFiles: string[] = await filesInDir(path, 'utf8');
+  const topLevelFiles: string[] = await util.readdir(dirPath, 'utf8');
   const fileList: string[] = [];
 
   await Promise.all(topLevelFiles.map(async (file) => {
@@ -211,7 +220,7 @@ export async function getJSFiles(dirPath: string): Promise<string[]> {
     if (file.endsWith('.js')) {
       fileList.push(currFile);
     } else if (
-        (await fileInfo(currFile)).isDirectory() && file !== 'node_modules') {
+        (await util.stat(currFile)).isDirectory() && file !== 'node_modules') {
       const subArr = await getJSFiles(currFile);
       fileList.push(...subArr);
     }
@@ -264,6 +273,7 @@ export async function getPackageTreeFromDependencyList(
   await Promise.all(packageTreeArr.map(async element => {
     element.dependencies = await populateDependencies(element, packageLockJson);
   }));
+
   return packageTreeArr.sort(compare);
 }
 
@@ -277,6 +287,9 @@ async function populateDependencies(
     // tslint:disable-next-line:no-any
     packageLockJson: any): Promise<PackageTree[]> {
   const packageName = pkg.name;
+  if (!packageLockJson.dependencies[packageName]) {
+    return [];
+  }
   const dependencies = packageLockJson.dependencies[packageName].requires;
   if (!dependencies) {
     return [];
