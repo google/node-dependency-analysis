@@ -33,7 +33,7 @@ export const ioModuleList: string[] =
  */
 export function getIOModules(
     contents: string, file: string): PointOfInterest[] {
-  const acornTree = acorn.parse(contents);
+  const acornTree = acorn.parse(contents, {locations: true});
   const requireCalls = getRequireCalls(acornTree);
   const moduleList = getRequiredModules(requireCalls, file, false);
   const requiredIOModules =
@@ -51,7 +51,7 @@ export function getIOModules(
 export function getDynamicEval(
     contents: string, file: string): PointOfInterest[] {
   const dynamicEvals: PointOfInterest[] = [];
-  const acornTree = acorn.parse(contents);
+  const acornTree = acorn.parse(contents, {locations: true});
   const dynamicRequireCalls: PointOfInterest[] =
       getDynamicRequireCalls(acornTree, file);
 
