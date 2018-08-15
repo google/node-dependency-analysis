@@ -6,6 +6,7 @@
   "dependencies": {
     "acorn": "^5.7.1",
     "meow": "^5.0.0",
+    "mkdirp": "^0.5.1",
     "pify": "^3.0.0"
   },
   "devDependencies": {
@@ -16,6 +17,7 @@
     "@types/node": "^10.5.7",
     "@types/pify": "^3.0.2",
     "@types/tmp": "0.0.33",
+    "@types/mkdirp": "^0.5.2",
     "ava": "^0.25.0",
     "execa": "^0.10.0",
     "gts": "^0.7.1",

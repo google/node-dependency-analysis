@@ -16,17 +16,28 @@
 
 import execa from 'execa';
 import * as fs from 'fs';
+import * as mkdirp from 'mkdirp';
+import * as path from 'path';
 import {join} from 'path';
 import pify from 'pify';
 import * as tmp from 'tmp';
 
-const mkdirP = pify(fs.mkdir) as typeof fs.promises.mkdir;
+// The types for mkdirp are not defined correctly, once fixed this should be
+// removed.
+// tslint:disable-next-line:no-any
+const mkdirpP = pify((mkdirp as any).mkdirp);
 const writeFileP = pify(fs.writeFile) as typeof fs.promises.writeFile;
 
 interface PackageJson {
   name: string;
   version: string;
   dependencies: {[key: string]: string;};
+  containedFiles: FileDetails[];
+}
+
+interface FileDetails {
+  filePath: string;
+  contents: string;
 }
 
 class NVT {
@@ -94,7 +105,8 @@ export class TestProject {
                                     },
                                     {} as {
                                       [key: string]: string;
-                                    })
+                                    }),
+                                containedFiles: []
                               };
                             }) as PackageJson[];
     this.topLevelDependencies = graph['*'];
@@ -131,12 +143,13 @@ export class TestProject {
     });
     await Promise.all(this.packageJsons.map(async pJson => {
       const dirname = join(path, NVT.stringify(pJson));
-      await mkdirP(dirname);
+      await mkdirpP(dirname);
       await writeFileP(
           join(dirname, 'package.json'), JSON.stringify(pJson, null, 2));
       await writeFileP(
           join(dirname, 'index.js'),
           `module.exports = '${pJson.name}@${pJson.version}';`);
+      await this.createExtraFiles(pJson.containedFiles, dirname);
     }));
     // main package.json file
     await writeFileP(
@@ -159,6 +172,40 @@ export class TestProject {
             null, 2));
     await execa('npm', ['install'], {cwd: path});
     return path;
+  }
+
+  /**
+   * Creates the extra files added with the addFile() method
+   */
+  private async createExtraFiles(
+      containedFiles: FileDetails[], dirname: string) {
+    await Promise.all(containedFiles.map(async (file) => {
+      await mkdirpP(path.dirname(join(dirname, file.filePath)));
+      await writeFileP(join(dirname, file.filePath), file.contents);
+    }));
+  }
+
+  /**
+   * Searches for a module in packageJsons then adds a new file
+   * object to its containedFiles array
+   * Both the name and version of the module have to match,
+   * otherwise an error will be thrown
+   * @param filePath The path where this file should be located relative to the
+   * root directory of the module
+   * @param fileContents The contents of the file being written
+   */
+  addFile(module: NameVersionTuple, filePath: string, fileContents: string) {
+    const moduleInfo = NVT.parse(module);
+    for (const pkg of this.packageJsons) {
+      if (pkg.name === moduleInfo.name && pkg.version === moduleInfo.version) {
+        pkg.containedFiles.push({filePath, contents: fileContents});
+        // Return this so that we can chain adding files together
+        // ie: addFile().addFile().addFile()
+        return this;
+      }
+    }
+    // If this point is reached the module doesn't exist in this project
+    throw new Error(`${module} not found`);
   }
 
   /**
