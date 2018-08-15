@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import {ENOENT} from 'constants';
 import fs from 'fs';
 import pify from 'pify';
 
@@ -26,7 +24,7 @@ export async function exists(file: string) {
   try {
     await stat(file);
   } catch (err) {
-    if (err === ENOENT) {
+    if (err.code === 'ENOENT') {
       return false;
     } else {
       throw err;
