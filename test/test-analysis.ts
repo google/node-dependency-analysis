@@ -138,3 +138,22 @@ test(
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
+
+test(
+    'when there is a syntax error in a file, getSyntaxError should return ' +
+        'a syntax poi',
+    async t => {
+      const content = 'const s = \'';
+      const result = analysis.getSyntaxError(content, 'file');
+      t.notDeepEqual(result, undefined);
+      t.deepEqual(result!.type, 'Syntax Error');
+    });
+
+test(
+    'when there is no syntax errors in a file, getSyntaxError should ' +
+        'not return a poi',
+    async t => {
+      const content = 'const s = \'string\'';
+      const result = analysis.getSyntaxError(content, 'file');
+      t.deepEqual(result, undefined);
+    });

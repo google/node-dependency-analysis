@@ -33,7 +33,8 @@ export const ioModuleList: string[] =
  */
 export function getIOModules(
     contents: string, file: string): PointOfInterest[] {
-  const acornTree = acorn.parse(contents, {locations: true});
+  const acornTree =
+      acorn.parse(contents, {locations: true, allowHashBang: true});
   const requireCalls = getRequireCalls(acornTree);
   const moduleList = getRequiredModules(requireCalls, file, false);
   const requiredIOModules =
@@ -51,7 +52,8 @@ export function getIOModules(
 export function getDynamicEval(
     contents: string, file: string): PointOfInterest[] {
   const dynamicEvals: PointOfInterest[] = [];
-  const acornTree = acorn.parse(contents, {locations: true});
+  const acornTree =
+      acorn.parse(contents, {allowHashBang: true, locations: true});
   const dynamicRequireCalls: PointOfInterest[] =
       getDynamicRequireCalls(acornTree, file);
 
@@ -62,6 +64,24 @@ export function getDynamicEval(
   dynamicEvals.push(...dynamicRequireArgs);
   dynamicEvals.push(...dynamicRequireCalls);
   return dynamicEvals;
+}
+
+/**
+ * Creates a Point of Interest object if there are syntax error(s) in a file
+ *
+ * @param contents the contents of the file
+ * @param file the name of the file being checked
+ */
+export function getSyntaxError(contents: string, file: string): PointOfInterest|
+    null {
+  try {
+    acorn.parse(contents, {allowHashBang: true, locations: true});
+  } catch (err) {
+    const pos = {lineStart: 0, lineEnd: 0, colStart: 0, colEnd: 0};
+    const syntaxError = {type: 'Syntax Error', fileName: file, position: pos};
+    return syntaxError;
+  }
+  return null;
 }
 
 /**

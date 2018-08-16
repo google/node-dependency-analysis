@@ -15,7 +15,7 @@
  */
 import * as path from 'path';
 
-import {getDynamicEval, getIOModules} from './analysis';
+import * as analysis from './analysis';
 import * as util from './util';
 
 export interface ReadFileP {
@@ -120,7 +120,8 @@ export async function getPackagePOIList(path: string):
 
   await Promise.all(files.map(async (file) => {
     const content = await util.readFile(file, 'utf8');
-    const functionArr: Function[] = [getIOModules, getDynamicEval];
+    const functionArr: Function[] =
+        [analysis.getIOModules, analysis.getDynamicEval];
     const filePOIList = getPointsOfInterest(content, file, functionArr);
     packagePOIList.push(...filePOIList);
   }));
@@ -240,10 +241,17 @@ function getPointsOfInterest(
     contents: string, fileName: string,
     functionArray: Function[]): PointOfInterest[] {
   const pointsOfInterest: PointOfInterest[] = [];
-  functionArray.forEach((f) => {
-    const subList = f(contents, fileName);
-    pointsOfInterest.push(subList);
-  });
+  const syntaxError = analysis.getSyntaxError(contents, fileName);
+
+  // If there are no syntax errors, then use the other detection functions
+  if (!syntaxError) {
+    functionArray.forEach((f) => {
+      const subList = f(contents, fileName);
+      pointsOfInterest.push(...subList);
+    });
+  } else {
+    pointsOfInterest.push(syntaxError);
+  }
   return pointsOfInterest;
 }
 
