@@ -14,19 +14,22 @@
     "@types/estree": "0.0.39",
     "@types/execa": "^0.9.0",
     "@types/meow": "^4.0.1",
+    "@types/mkdirp": "^0.5.2",
     "@types/node": "^10.5.7",
     "@types/pify": "^3.0.2",
     "@types/tmp": "0.0.33",
-    "@types/mkdirp": "^0.5.2",
     "ava": "^0.25.0",
+    "codecov": "^3.0.4",
     "execa": "^0.10.0",
     "gts": "^0.7.1",
+    "nyc": "^12.0.2",
     "pify": "^3.0.0",
     "tmp": "0.0.33",
     "typescript": "~2.8.0"
   },
   "scripts": {
-    "test": "ava build/test/test*.js",
+    "codecov": "nyc report --reporter=json && codecov -f coverage/*.json",
+    "test": "nyc ava build/test/test-*.js",
     "check": "gts check",
     "clean": "gts clean",
     "compile": "tsc -p .",
@@ -37,5 +40,10 @@
   },
   "keywords": [],
   "author": "",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "ava": {
+    "require": [
+      "source-map-support/register"
+    ]
+  }
 }
