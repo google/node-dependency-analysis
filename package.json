@@ -24,12 +24,13 @@
     "gts": "^0.7.1",
     "nyc": "^12.0.2",
     "pify": "^3.0.0",
+    "source-map-support": "^0.5.8",
     "tmp": "0.0.33",
     "typescript": "~2.8.0"
   },
   "scripts": {
     "codecov": "nyc report --reporter=json && codecov -f coverage/*.json",
-    "test": "nyc ava build/test/test-*.js",
+    "test": "nyc ava",
     "check": "gts check",
     "clean": "gts clean",
     "compile": "tsc -p .",
@@ -41,9 +42,15 @@
   "keywords": [],
   "author": "",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=8"
+  },
   "ava": {
     "require": [
       "source-map-support/register"
+    ],
+    "files": [
+      "build/test/test-*.js"
     ]
   }
 }
