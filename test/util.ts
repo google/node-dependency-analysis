@@ -31,6 +31,7 @@ const writeFileP = pify(fs.writeFile) as typeof fs.promises.writeFile;
 interface PackageJson {
   name: string;
   version: string;
+  main?: string;
   dependencies: {[key: string]: string;};
   containedFiles: FileDetails[];
 }
@@ -193,12 +194,19 @@ export class TestProject {
    * @param filePath The path where this file should be located relative to the
    * root directory of the module
    * @param fileContents The contents of the file being written
+   * @param isMain if this option is set to true then the file will be set as
+   * the main file in this module's package.json
    */
-  addFile(module: NameVersionTuple, filePath: string, fileContents: string) {
+  addFile(
+      module: NameVersionTuple, filePath: string, fileContents: string,
+      isMain = false) {
     const moduleInfo = NVT.parse(module);
     for (const pkg of this.packageJsons) {
       if (pkg.name === moduleInfo.name && pkg.version === moduleInfo.version) {
         pkg.containedFiles.push({filePath, contents: fileContents});
+        if (isMain) {
+          pkg.main = filePath;
+        }
         // Return this so that we can chain adding files together
         // ie: addFile().addFile().addFile()
         return this;
