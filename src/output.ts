@@ -14,10 +14,63 @@
  * limitations under the License.
  */
 
+import semver from 'semver';
+
 import {PackageTree, PointOfInterest} from './package-tree';
 
 // File to output to user
-
 export function outputToUser(packageTree: PackageTree<PointOfInterest[]>) {
-  console.log(JSON.stringify(packageTree, null, 2));
+  const sortedModules = flattenPackageTree(packageTree).sort(compare);
+  console.log(output(sortedModules));
+}
+
+function flattenPackageTree(packageTree: PackageTree<PointOfInterest[]>):
+    Array<PackageTree<PointOfInterest[]>> {
+  const combined: Array<PackageTree<PointOfInterest[]>> = [];
+  combined.push(packageTree);
+  packageTree.dependencies.forEach((dep) => {
+    combined.push(...flattenPackageTree(dep));
+  });
+  return combined;
+}
+
+function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
+  const arrOfStrings: string[] = [];
+  packageTrees.forEach((packageTree) => {
+    arrOfStrings.push(
+        `Name: ${packageTree.name}, Version: ${packageTree.version}`);
+
+    if (packageTree.data.length > 0) {
+      arrOfStrings.push(`  Detected Patterns:`);
+    }
+
+    packageTree.data.forEach((data) => {
+      arrOfStrings.push(`     Type: ${data.type}, Location: ${data.fileName}:${
+          data.position.lineStart}`);
+    });
+  });
+
+  return arrOfStrings.join('\n');
+}
+
+/**
+ * Compare function for packages
+ * 
+ * @param a 1st package
+ * @param b 2nd package
+ */
+function compare(
+    a: PackageTree<PointOfInterest[]>,
+    b: PackageTree<PointOfInterest[]>): number {
+  if (a.name < b.name) {
+    return -1;
+  }
+  if (a.name > b.name) {
+    return 1;
+  }
+  if (semver.valid(a.version) && semver.valid(b.version)) {
+    return semver.compare(a.version, b.version);
+  } else {
+    return a.version.localeCompare(b.version);
+  }
 }

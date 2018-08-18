@@ -4,10 +4,12 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "@types/semver": "^5.5.0",
     "acorn": "^5.7.1",
     "meow": "^5.0.0",
     "mkdirp": "^0.5.1",
-    "pify": "^3.0.0"
+    "pify": "^3.0.0",
+    "semver": "^5.5.1"
   },
   "devDependencies": {
     "@types/acorn": "^4.0.3",
