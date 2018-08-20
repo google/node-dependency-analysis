@@ -55,7 +55,7 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
 
 /**
  * Compare function for packages
- * 
+ *
  * @param a 1st package
  * @param b 2nd package
  */

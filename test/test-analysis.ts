@@ -157,3 +157,26 @@ test(
       const result = analysis.getSyntaxError(content, 'file');
       t.deepEqual(result, undefined);
     });
+
+test('getEvalCalls should return pois for standard eval() usages', async t => {
+  const content = 'const e = eval(doSomethingBad())';
+  const result = analysis.getEvalCalls(content, 'file');
+  t.deepEqual(result.length, 1);
+  t.deepEqual(result[0].type, 'Eval Call');
+});
+
+test(
+    'getEvalCalls should return pois for eval identifiers under aliases',
+    async t => {
+      const content1 = 'const e = eval; e(doSomethingBad());';
+      const result1 = analysis.getEvalCalls(content1, 'file');
+      t.deepEqual(result1.length, 1);
+      t.deepEqual(result1[0].type, 'Eval Call');
+
+      const content2 =
+          'doSomethingBad(eval); function doSomethingBad(something)' +
+          '{something(doSomethingReallyBad());}';
+      const result2 = analysis.getEvalCalls(content2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'Eval Call');
+    });

@@ -35,7 +35,7 @@ export function getIOModules(
     contents: string, file: string): PointOfInterest[] {
   const acornTree =
       acorn.parse(contents, {locations: true, allowHashBang: true});
-  const requireCalls = getRequireCalls(acornTree);
+  const requireCalls = findCallee('require', acornTree);
   const moduleList = getRequiredModules(requireCalls, file, false);
   const requiredIOModules =
       moduleList.filter(mod => ioModuleList.includes(mod.type));
@@ -54,15 +54,22 @@ export function getDynamicEval(
   const dynamicEvals: PointOfInterest[] = [];
   const acornTree =
       acorn.parse(contents, {allowHashBang: true, locations: true});
-  const dynamicRequireCalls: PointOfInterest[] =
-      getDynamicRequireCalls(acornTree, file);
 
-  const requireCalls = getRequireCalls(acornTree);
+  const requireAliasPOIs: PointOfInterest[] = [];
+
+  const requireAliasCalls: Position[] =
+      locateCalleeAliases('require', acornTree);
+  requireAliasCalls.forEach((pos) => {
+    const requireAliasPOI = createPOI('Dynamic Require Call', file, pos);
+    requireAliasPOIs.push(requireAliasPOI);
+  });
+
+  const requireCalls = findCallee('require', acornTree);
   const dynamicRequireArgs: PointOfInterest[] =
       getRequiredModules(requireCalls, file, true);
 
   dynamicEvals.push(...dynamicRequireArgs);
-  dynamicEvals.push(...dynamicRequireCalls);
+  dynamicEvals.push(...requireAliasPOIs);
   return dynamicEvals;
 }
 
@@ -78,27 +85,55 @@ export function getSyntaxError(contents: string, file: string): PointOfInterest|
     acorn.parse(contents, {allowHashBang: true, locations: true});
   } catch (err) {
     const pos = {lineStart: 0, lineEnd: 0, colStart: 0, colEnd: 0};
-    const syntaxError = {type: 'Syntax Error', fileName: file, position: pos};
+    const syntaxError = createPOI('Syntax Error', file, pos);
     return syntaxError;
   }
   return null;
 }
 
 /**
- * Returns a list of acorn nodes that contain 'require' call expressions
+ * Gets a list of PointOfInterest objects that indicate usages of eval
  *
+ * @param contents the contents of the file
+ * @param file the name of the file being checked
+ */
+export function getEvalCalls(
+    contents: string, file: string): PointOfInterest[] {
+  const evalPOIs: PointOfInterest[] = [];
+
+  const acornTree =
+      acorn.parse(contents, {allowHashBang: true, locations: true});
+  const foundStandardEvalCalls: Node[] = findCallee('eval', acornTree);
+  foundStandardEvalCalls.forEach((node) => {
+    const evalPOI = createPOI('Eval Call', file, getPosition(node));
+    evalPOIs.push(evalPOI);
+  });
+
+  const positionsOfAliases: Position[] = locateCalleeAliases('eval', acornTree);
+  positionsOfAliases.forEach((pos) => {
+    const evalPOI = createPOI('Eval Call', file, pos);
+    evalPOIs.push(evalPOI);
+  });
+  return evalPOIs;
+}
+
+/**
+ * Finds specified identifiers and returns the AST node that
+ * they are located in
+ *
+ * @param id the identifier that is being searched for
  * @param tree abstract syntax tree
  */
-function getRequireCalls(tree: Node) {
-  const requireCalls: Node[] = [];
+function findCallee(id: string, tree: Node): Node[] {
+  const calleeUsages: Node[] = [];
   walk.simple(tree, {
     CallExpression(e: CallExpression) {
-      if (e.callee.type === 'Identifier' && e.callee.name === 'require') {
-        requireCalls.push(e.arguments[0]);
+      if (e.callee.type === 'Identifier' && e.callee.name === id) {
+        calleeUsages.push(e.arguments[0]);
       }
     }
   });
-  return requireCalls;
+  return calleeUsages;
 }
 
 /**
@@ -130,7 +165,7 @@ function getRequiredModules(
           qua[0].value.raw === '' && qua[1].value.raw === '') {
         if (exp.type === 'Literal' && exp.value) {
           const mod = exp.value.toString();
-          requiredModules.push({type: mod, fileName: file, position: pos});
+          requiredModules.push(createPOI(mod, file, pos));
         }
 
         // String interpolation without expression
@@ -138,15 +173,13 @@ function getRequiredModules(
         const mod = qua[0].value.raw;
         requiredModules.push({type: mod, fileName: file, position: pos});
       } else {
-        dynamicEvalModules.push(
-            {type: 'Dynamic Require Arg', fileName: file, position: pos});
+        dynamicEvalModules.push(createPOI('Dynamic Require Arg', file, pos));
       }
 
       // If expression is not a literal or a template literal, it is dynamically
       // evaluated
     } else {
-      dynamicEvalModules.push(
-          {type: 'Dynamic Require Arg', fileName: file, position: pos});
+      dynamicEvalModules.push(createPOI('Dynamic Require Arg', file, pos));
     }
   });
 
@@ -158,33 +191,32 @@ function getRequiredModules(
 }
 
 /**
- * Returns list of PointOfInterest objects, indicating that the require
- * identifier was used other than in a call expression
+ * Given a specific identifier, this method returns a list of positions where
+ * the identifier is found under aliases
  *
+ * @param id the identifier being searched for
  * @param tree abstract syntax tree
  * @param file the name of the file being checked
  */
-function getDynamicRequireCalls(tree: Node, file: string): PointOfInterest[] {
-  const dynamicRequireCalls: PointOfInterest[] = [];
+function locateCalleeAliases(id: string, tree: Node): Position[] {
+  const positions: Position[] = [];
   walk.fullAncestor(tree, (n: Node, ancestors: Node[]) => {
     if (n.type === 'Identifier' && n && n !== undefined) {
-      if (n.name === 'require') {
+      if (n.name === id) {
         // last element is current node and second to last it the node's
         // parent
         const parent: Node = ancestors[ancestors.length - 2];
-        if (parent.type !== 'CallExpression' || parent.arguments.length !== 1) {
-          // Dynamic Require call
 
-          // Get the entire line which is the second element of ancestors
-          // array b/c 1st is the program
+        // If node has name of id, and isn't a callee of a Call Expression
+        if (parent.type !== 'CallExpression' || parent.callee !== n) {
+          // Get the second element of ancestors array b/c 1st is the program
           const pos: Position = getPosition(ancestors[1]);
-          dynamicRequireCalls.push(
-              {type: 'Dynamic Require Call', fileName: file, position: pos});
+          positions.push(pos);
         }
       }
     }
   });
-  return dynamicRequireCalls;
+  return positions;
 }
 
 /**
@@ -199,4 +231,16 @@ function getPosition(node: Node): Position {
     pos.colStart = node.loc.start.column, pos.colEnd = node.loc.end.column;
   }
   return pos;
+}
+
+/**
+ * Creates a Point of Interest(poi) object
+ *
+ * @param type the type of poi
+ * @param file the file in which the poi is located
+ * @param position the location in the file that the poi is located
+ */
+function createPOI(
+    type: string, fileName: string, position: Position): PointOfInterest {
+  return {type, fileName, position};
 }
