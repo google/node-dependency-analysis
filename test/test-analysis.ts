@@ -180,3 +180,50 @@ test(
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Eval Call');
     });
+
+test(
+    'getEnvAccesses should return pois for accesses to the env ' +
+        'property in the process object',
+    async t => {
+      const content1 = 'const r = process.env.SOME_TOKEN';
+      const result1 = analysis.getEnvAccesses(content1, 'file');
+      t.deepEqual(result1.length, 1);
+      t.deepEqual(result1[0].type, 'Access to process.env');
+
+
+      const content2 = 'const r = process[\'env\'].SOME_TOKEN';
+      const result2 = analysis.getEnvAccesses(content2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'Access to process.env');
+
+      const content3 = 'doBadThings(Object.keys(process[\'env\']).map' +
+          '(k => process[\'env\'][k]));';
+      const result3 = analysis.getEnvAccesses(content3, 'file');
+      t.deepEqual(result3.length, 2);
+    });
+
+test('getEnvAccesses should return pois for obscured properties', async t => {
+  const content1 = 'const r = process[\'e\' + \'n\' + \'v\']';
+  const result1 = analysis.getEnvAccesses(content1, 'file');
+  t.deepEqual(result1.length, 1);
+  t.deepEqual(result1[0].type, 'Obscured process property');
+});
+
+test(
+    'getEnvAccesses should return pois for obscured process objects',
+    async t => {
+      const content = 'doSomething(process); function doSomething(s)' +
+          '{return s.env.NPM_TOKEN;}';
+      const result = analysis.getEnvAccesses(content, 'file');
+      t.deepEqual(result.length, 1);
+      t.deepEqual(result[0].type, 'Obscured process object');
+    });
+
+test(
+    'getEnvAccesses should not return pois when other other ' +
+        'properties of process are being accessed',
+    async t => {
+      const content = 'const arvs = process.argv;';
+      const result = analysis.getEnvAccesses(content, 'file');
+      t.deepEqual(result.length, 0);
+    });

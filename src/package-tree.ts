@@ -121,8 +121,8 @@ export async function getPackagePOIList(path: string):
   await Promise.all(files.map(async (file) => {
     const content = await util.readFile(file, 'utf8');
     const functionArr: Function[] = [
-      analysis.getIOModules, analysis.getDynamicEval, analysis.getSyntaxError,
-      analysis.getEvalCalls
+      analysis.getIOModules, analysis.getDynamicEval, analysis.getEvalCalls,
+      analysis.getEnvAccesses
     ];
     const filePOIList = getPointsOfInterest(content, file, functionArr);
     packagePOIList.push(...filePOIList);
