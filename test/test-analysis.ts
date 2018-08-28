@@ -70,11 +70,35 @@ test('getIOModules should detect both http and fs module', async t => {
 });
 
 test(
+    'getArbitraryExecutionMods should detect child_process, repl, vm, module',
+    async t => {
+      const content1 = 'const a = require(\'child_process\');';
+      const result1 = analysis.getArbitraryExecutionMods(content1, 'file');
+      t.deepEqual(result1.length, 1);
+      t.deepEqual(result1[0].type, 'child_process');
+
+      const content2 = 'const b = require(\'repl\');';
+      const result2 = analysis.getArbitraryExecutionMods(content2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'repl');
+
+      const content3 = 'require(\'vm\').runInNewContext(\'doSomething();\')';
+      const result3 = analysis.getArbitraryExecutionMods(content3, 'file');
+      t.deepEqual(result3.length, 1);
+      t.deepEqual(result3[0].type, 'vm');
+
+      const content4 = 'const b = require(\'module\');';
+      const result4 = analysis.getArbitraryExecutionMods(content4, 'file');
+      t.deepEqual(result4.length, 1);
+      t.deepEqual(result4[0].type, 'module');
+    });
+
+test(
     'getDynamicEval should detect concatenation of strings that forms http ' +
         'as a dyanmic require arg',
     async t => {
       const content = 'const a = require(\'h\' + \'t\' + \'t\' + \'p\');';
-      const result = analysis.getDynamicEval(content, 'file');
+      const result = analysis.getDynamicRequires(content, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
@@ -85,12 +109,12 @@ test(
     async t => {
       const content1 =
           `const a = \'anotherhttp\'\nconst b = require(a.substring(6));`;
-      const result1 = analysis.getDynamicEval(content1, 'file');
+      const result1 = analysis.getDynamicRequires(content1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'Dynamic Require Arg');
 
       const content2 = 'const a = require(\'anotherhttp\'.substring(6))';
-      const result2 = analysis.getDynamicEval(content2, 'file');
+      const result2 = analysis.getDynamicRequires(content2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Dynamic Require Arg');
     });
@@ -101,7 +125,7 @@ test(
     async t => {
       const content =
           'function returnHttp(){return \'http\';}\nconst a = require(returnHttp);';
-      const result = analysis.getDynamicEval(content, 'file');
+      const result = analysis.getDynamicRequires(content, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
@@ -112,7 +136,7 @@ test(
       const content = `function something(){ return 1;}
                         const a = require; 
                         const b = a(\'https\');`;
-      const result = analysis.getDynamicEval(content, 'file');
+      const result = analysis.getDynamicRequires(content, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
@@ -123,7 +147,7 @@ test(
     async t => {
       const content =
           'function returnRequire(){return require;}\n const a = returnRequire();\nconst b = a(\'http\');';
-      const result = analysis.getDynamicEval(content, 'file');
+      const result = analysis.getDynamicRequires(content, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
@@ -134,7 +158,7 @@ test(
     async t => {
       const content =
           'function f(a, b){return a(b)}\nconst a = f(require, \'http\');';
-      const result = analysis.getDynamicEval(content, 'file');
+      const result = analysis.getDynamicRequires(content, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });

@@ -27,9 +27,6 @@ enum IdType {
   OBJECT
 }
 
-export const ioModuleList: string[] =
-    ['http', 'fs', 'https', 'http2', 'net', 'datagram', 'child_process'];
-
 /**
  * Gets a list of PointOfInterest objects, indicating that there were IO
  * modules that were required in a file
@@ -39,13 +36,26 @@ export const ioModuleList: string[] =
  */
 export function getIOModules(
     contents: string, file: string): PointOfInterest[] {
-  const acornTree =
-      acorn.parse(contents, {locations: true, allowHashBang: true});
-  const requireCalls = findCallee('require', acornTree);
-  const moduleList = getRequiredModules(requireCalls, file, false);
-  const requiredIOModules =
-      moduleList.filter(mod => ioModuleList.includes(mod.type));
-  return requiredIOModules;
+  const ioModuleList: string[] =
+      ['http', 'fs', 'https', 'http2', 'net', 'datagram'];
+  const found = findModules(contents, file, ioModuleList);
+  return found;
+}
+
+/**
+ * Gets a list of PointOfInterest objects, indicating that there were
+ * required modules that can execute arbitrary code
+ *
+ * @param contents the contents of the file
+ * @param file the name of the file being checked
+ */
+export function getArbitraryExecutionMods(
+    contents: string, file: string): PointOfInterest[] {
+  const arbitraryExecutionMods: string[] =
+      ['child_process', 'repl', 'vm', 'module'];
+  const found = findModules(contents, file, arbitraryExecutionMods);
+
+  return found;
 }
 
 /**
@@ -55,9 +65,8 @@ export function getIOModules(
  * @param contents the contents of the file
  * @param file the name of the file being checked
  */
-export function getDynamicEval(
+export function getDynamicRequires(
     contents: string, file: string): PointOfInterest[] {
-  const dynamicEvals: PointOfInterest[] = [];
   const acornTree =
       acorn.parse(contents, {allowHashBang: true, locations: true});
 
@@ -74,9 +83,7 @@ export function getDynamicEval(
   const dynamicRequireArgs: PointOfInterest[] =
       getRequiredModules(requireCalls, file, true);
 
-  dynamicEvals.push(...dynamicRequireArgs);
-  dynamicEvals.push(...requireAliasPOIs);
-  return dynamicEvals;
+  return [...requireAliasPOIs, ...dynamicRequireArgs];
 }
 
 /**
@@ -332,6 +339,23 @@ function getArgument(node: Node): string|null {
   } else {
     return null;
   }
+}
+
+/**
+ * Finds and creates POI for modules in the list that are required in the file
+ *
+ * @param contents the contents of the file
+ * @param file the file being checked
+ * @param moduleList the array of modules that are being searched for
+ */
+function findModules(contents: string, file: string, moduleList: string[]) {
+  const acornTree =
+      acorn.parse(contents, {locations: true, allowHashBang: true});
+  const requireCalls = findCallee('require', acornTree);
+  const modulesFound = getRequiredModules(requireCalls, file, false);
+  const requiredModules =
+      modulesFound.filter(mod => moduleList.includes(mod.type));
+  return requiredModules;
 }
 
 /**
