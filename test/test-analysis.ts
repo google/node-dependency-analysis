@@ -155,7 +155,7 @@ test(
     async t => {
       const content = 'const s = \'string\'';
       const result = analysis.getSyntaxError(content, 'file');
-      t.deepEqual(result, undefined);
+      t.deepEqual(result, null);
     });
 
 test('getEvalCalls should return pois for standard eval() usages', async t => {

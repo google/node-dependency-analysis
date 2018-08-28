@@ -22,16 +22,18 @@ import test from 'ava';
 import path from 'path';
 
 import * as tree from '../src/package-tree';
-import {generatePackageTree, getPackageTreeFromDependencyList, PackageTree} from '../src/package-tree';
+import {generatePackageTree, PackageTree} from '../src/package-tree';
 
-import * as tests from './mock-projects';
+import {testCases} from './mock-projects';
+import * as util from './util';
 
 test(
     'the data property of the package tree should changed from undefined ' +
         'to an array of Points of Interest',
     async t => {
       // See how the dependency graph looks in test-projects
-      const testPath: string = await tests.test1.create();
+      const testProject = new util.TestProject(testCases.test1);
+      const testPath: string = await testProject.create();
 
       const c1 = {name: 'c', version: '1.0.0', data: null, dependencies: []};
       const c2 = {name: 'c', version: '2.0.0', data: null, dependencies: []};
@@ -70,7 +72,7 @@ test(
       t.deepEqual(c1Pjson2.name, c1Pjson2.name);
       t.deepEqual(c1Pjson2.version, c1Pjson2.version);
 
-      tests.test1.cleanup();
+      testProject.cleanup();
     });
 
 /* TODO: test2
@@ -88,113 +90,18 @@ function sortByName(a: PackageTree<string>, b: PackageTree<string>) {
   }
 }
 
-test(
-    'getPackageTreeFromDependencyList should return a PackageTree array',
-    async t => {
-      const dependencies = {module1: 'version1', module2: 'version2'};
-      const packageLock = {
-        dependencies: {
-          module1: {requires: {module5: 'version5'}},
-          module2: {requires: {module6: 'version6'}},
-          module3: {requires: {module4: 'version4'}},
-          module4: {},
-          module5: {},
-          module6: {}
-        }
-      };
-      const result =
-          await getPackageTreeFromDependencyList(dependencies, packageLock);
-      const expectedResult = [
-        {
-          name: 'module1',
-          version: 'version1',
-          data: null,
-          dependencies: [{
-            name: 'module5',
-            version: 'version5',
-            data: null,
-            dependencies: []
-          }]
-        },
 
-        {
-          name: 'module2',
-          version: 'version2',
-          data: null,
-          dependencies: [{
-            name: 'module6',
-            version: 'version6',
-            data: null,
-            dependencies: []
-          }]
-        }
-      ];
-      t.deepEqual(result, expectedResult);
-    });
 
 test(
     'generatePackageTree should return a populated PackageTree given a project name and its root directory',
     async t => {
-      const pkgJson = {
-        name: 'testProject',
-        version: '1.0.0',
-        dependencies: {
-          module1: 'version1',
-        },
-        devDependencies: {module2: 'version2'}
-      };
-      const packageLock = {
-        dependencies: {
-          module1: {requires: {module5: 'version5'}},
-          module2: {requires: {module6: 'version6'}},
-          module3: {requires: {module4: 'version4'}},
-          module4: {},
-          module5: {},
-          module6: {}
-        }
-      };
-      async function fakeReadFilep(filepath: string): Promise<string> {
-        if (filepath === 'package.json') {
-          return JSON.stringify(pkgJson);
-        }
-        if (filepath === 'package-lock.json') {
-          return JSON.stringify(packageLock);
-        }
-        throw new Error('File Not Found');
+      const mockProjectKeys = Object.keys(testCases);
+      for (const mockProjectKey of mockProjectKeys) {
+        const testResultObj = await testFunctionCreator(mockProjectKey);
+        t.deepEqual(testResultObj.actualResult, testResultObj.expectedResult);
       }
-      const result = await generatePackageTree('.', fakeReadFilep);
-      const expectedResult = {
-        name: 'testProject',
-        version: '1.0.0',
-        data: null,
-        dependencies: [
-          {
-            name: 'module1',
-            version: 'version1',
-            data: null,
-            dependencies: [{
-              name: 'module5',
-              version: 'version5',
-              data: null,
-              dependencies: []
-            }]
-          },
-
-          {
-            name: 'module2',
-            version: 'version2',
-            data: null,
-            dependencies: [{
-              name: 'module6',
-              version: 'version6',
-              data: null,
-              dependencies: []
-            }]
-          }
-        ]
-      };
-      t.deepEqual(result, expectedResult);
     });
+
 test(
     'generatePackageTree throws an error if it can not find a file',
     async t => {
@@ -205,3 +112,91 @@ test(
       await t.throws(
           generatePackageTree('.', fakeReadFilep), Error, 'File Not Found');
     });
+
+test(
+    'generatePackageTree does not create duplicates of the same module when multiple modules depend on it',
+    async t => {
+      const testProject = new util.TestProject(testCases.test3);
+      const testPath = await testProject.create();
+      const packageTreeResult = await generatePackageTree(testPath);
+      t.true(
+          packageTreeResult.dependencies[0].dependencies[0] ===
+          packageTreeResult.dependencies[1].dependencies[0]);
+      testProject.cleanup();
+    });
+
+/**
+ * Generates a PackageTree given a TestProject object
+ * @param testProjectObj the object passed to the TestProject constructor
+ */
+function generateExpectedTree(testProjectObj: util.DependencyGraph):
+    PackageTree<null> {
+  const keys = Object.keys(testProjectObj).sort();
+  const createdPackageTrees = new Map<string, PackageTree>();
+  const treeHead =
+      {name: 'test-project', version: '0.0.0', data: null, dependencies: []};
+  createdPackageTrees.set('*', treeHead);
+
+  // Skip the root, because it was added above
+  for (let keyIndex = 1; keyIndex < keys.length; keyIndex++) {
+    const nvt = util.NVT.parse(keys[keyIndex]);
+    const pkgT = {
+      name: nvt.name,
+      version: `file:${keys[keyIndex]}`,
+      data: null,
+      dependencies: []
+    };
+    createdPackageTrees.set(keys[keyIndex], pkgT);
+  }
+  for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+    const currentPackageTree = createdPackageTrees.get(keys[keyIndex]);
+    if (currentPackageTree) {
+      const dependencies = testProjectObj[keys[keyIndex]];
+      dependencies.forEach(element => {
+        if (!createdPackageTrees.has(element)) {
+          throw new Error(
+              `Dependency ${element} is not present in this test project.`);
+        }
+        currentPackageTree.dependencies.push(createdPackageTrees.get(element)!);
+      });
+    }
+  }
+  return treeHead;
+}
+
+/**
+ * Takes in the name of a testProject in mock-projects and returns an object
+ * with populated fields corresponding to important test data
+ * @param testProjectName
+ */
+async function testFunctionCreator(testProjectName: string):
+    Promise<TestResults> {
+  const testGraph = testCases[testProjectName];
+  const testProject = new util.TestProject(testGraph);
+  const testProjectPath = await testProject.create();
+  const actualResult = await generatePackageTree(testProjectPath);
+  const expectedResult = generateExpectedTree(testGraph);
+  testProject.cleanup();
+  return {
+    testGraph,
+    testProject,
+    testProjectPath,
+    actualResult,
+    expectedResult
+  };
+}
+
+/**
+ * testGraph: The dependency graph used for this test
+ * testProject: The TestProject object created for this test
+ * testProjectPath: The path to the root of the TestProject created
+ * actualResult: A PackageTree generated from generatePackageTree
+ * expectedResult: A PackageTree generated from generateExpectedPackageTree
+ */
+interface TestResults {
+  testGraph: util.DependencyGraph;
+  testProject: util.TestProject;
+  testProjectPath: string;
+  actualResult: tree.PackageTree<null>;
+  expectedResult: tree.PackageTree<null>;
+}

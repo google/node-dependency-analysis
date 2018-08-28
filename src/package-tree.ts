@@ -13,7 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+import * as fs from 'fs';
 import * as path from 'path';
+import pify from 'pify';
+
+// import { PackageLockJson, Dependency } from './packageLock.d';
 
 import * as analysis from './analysis';
 import * as util from './util';
@@ -21,6 +26,8 @@ import * as util from './util';
 export interface ReadFileP {
   (path: string, encoding: string): Promise<string>;
 }
+
+const readFilep: ReadFileP = pify(fs.readFile);
 
 export interface PointOfInterest {
   type: string;
@@ -42,40 +49,27 @@ export interface PackageTree<T = null> {
   dependencies: Array<PackageTree<T>>;
 }
 
-/**
- * Takes in the root directory of a project and returns returns a PackageTree
- */
-export async function generatePackageTree(
-    rootDir: string,
-    customReadFilep: ReadFileP = util.readFile): Promise<PackageTree<null>> {
-  // Step 0: read in package.json and package-lock.json
-  const pjsonPath = path.join(rootDir, 'package.json');
-  const pjson = await customReadFilep(pjsonPath, 'utf8');
-  const packageJson = JSON.parse(pjson);
-
-  const pjsonLockPath = path.join(rootDir, 'package-lock.json');
-  const pjsonLock = await customReadFilep(pjsonLockPath, 'utf8');
-  const packageLockJson = JSON.parse(pjsonLock);
-
-  // Step 1: Get the top level dependencies from pjson
-  const dependencies = {
-    ...packageJson.dependencies,
-    ...packageJson.devDependencies
-  };
-
-  // Step 2: Look at package-lock.json to find dependendencies
-  const result =
-      await getPackageTreeFromDependencyList(dependencies, packageLockJson);
-
-  const treeHead: PackageTree = {
-    name: packageJson.name,
-    version: packageJson.version,
-    data: null,
-    dependencies: result
-  };
-
-  return treeHead;
+export interface PackageLock {
+  name: string;
+  version: string;
+  lockfileVersion: number;
+  packageIntegrity?: string;
+  preserveSymlinks?: boolean;
+  requires?: boolean;
+  dependencies?: {[moduleName: string]: Dependency};
 }
+
+export interface Dependency {
+  version: string;
+  integrity?: string;
+  resolved?: string;
+  bundled?: boolean;
+  dev?: boolean;
+  optional?: boolean;
+  requires?: {[moduleName: string]: string};
+  dependencies?: {[moduleName: string]: Dependency};
+}
+
 
 /**
  * Replaces the data of each node in the packageTree with the Points Of
@@ -258,62 +252,146 @@ function getPointsOfInterest(
 }
 
 /**
- * Takes in a list of depndencies and returns a constructed PackageTree
- * @param packageLockJson the package-lock.json file of the root project
+ * Takes in the root directory of a project and returns returns a
+ * PackageTree<null>
+ * @param rootDir The project's root directory.
+ * Will fail if there is no package.json and package-lock.json in this directory
  */
-export async function getPackageTreeFromDependencyList(
-    dependencies: {}, packageLockJson: {}): Promise<PackageTree[]> {
-  // Step 1: For each dependency create a PackageTree obj with the name and
-  // version fields populated
-  if (!dependencies) {
-    return [];
+export async function generatePackageTree(
+    rootDir: string,
+    customReadFilep: ReadFileP = readFilep): Promise<PackageTree> {
+  // Step 0: read in package.json and package-lock.json
+  const pjsonPath = path.join(rootDir, 'package.json');
+  const pjson = await customReadFilep(pjsonPath, 'utf8');
+  const packageJson = JSON.parse(pjson);
+
+
+  const pjsonLockPath = path.join(rootDir, 'package-lock.json');
+  const pjsonLock = await customReadFilep(pjsonLockPath, 'utf8');
+  const packageLockJson: PackageLock = JSON.parse(pjsonLock);
+
+  // Step 1: Initialize fields
+  const rootMap = new Map<string, PackageTree<null>>();
+  const projectName = packageJson.name;
+  const projectVersion = packageJson.version;
+  const treeHead: PackageTree = {
+    name: projectName,
+    version: projectVersion,
+    data: null,
+    dependencies: []
+  };
+
+  rootMap.set(projectName, treeHead);
+
+  // Step 2: Get the top level dependencies of packageLock
+  if (!packageLockJson.dependencies) {
+    // If there are no dependencies skip the checks below
+    return treeHead;
+  }
+  /*
+   * Hoisted dependencies are all the modules able to be depended on by any
+   * module in a project. These modules are all the top level objects in
+   * packageLockJson.dependencies.
+   */
+  const hoistedDependencies = Object.keys(packageLockJson.dependencies);
+
+  for (const hoistedDependency of hoistedDependencies) {
+    rootMap.set(hoistedDependency, {
+      name: hoistedDependency,
+      version: packageLockJson.dependencies[hoistedDependency].version,
+      data: null,
+      dependencies: []
+    });
   }
 
-  const dependencyArr: Array<[string, string]> = Object.entries(dependencies);
-  const packageTreeArr: PackageTree[] = [];
+  // Step 3: Add the top level dependencies to treeHead.dependencies
+  const rootRequires = Object.keys(packageJson.dependencies);
+  for (const requiredModuleName of rootRequires) {
+    // Sanity check
+    if (!rootMap.has(requiredModuleName)) {
+      throw new Error(
+          'Dependencies of package.json and package-lock.json do not match');
+    }
+    treeHead.dependencies.push(rootMap.get(requiredModuleName)!);
+  }
 
-  dependencyArr.forEach((element: [string, string]) => {
-    const pkgTreeObj: PackageTree =
-        {name: element[0], version: element[1], data: null, dependencies: []};
+  for (const dependency of hoistedDependencies) {
+    if (packageLockJson.dependencies[dependency]) {
+      generatePackageTreeRec(
+          dependency, packageLockJson.dependencies[dependency], [rootMap]);
+    }
+  }
 
-    packageTreeArr.push(pkgTreeObj);
-  });
+  return treeHead;
 
-  // Step 2: For each Package Tree obj get the dependencies
-  await Promise.all(packageTreeArr.map(async element => {
-    element.dependencies = await populateDependencies(element, packageLockJson);
-  }));
+  /**
+   * Creates a packageTree object for a given package
+   * @param packageName The name of the package
+   * @param packageObject This package's representation in package-lock.json.
+   * Contains information regarding what this package requires and its
+   * dependencies. It is of type Dependency because it is a dependency of the
+   * root project.
+   * @param dependenciesMap An array of Maps where the first element is a map of
+   * the highest level dependency's names and their corresponding packageTrees.
+   * The next element is a level down and so on.
+   */
+  function generatePackageTreeRec(
+      packageName: string, packageObject: Dependency,
+      dependenciesMap: Array<Map<string, PackageTree>>): PackageTree {
+    // Step 0: Create a map with all of this package's dependencies
+    const newMap = new Map<string, PackageTree>();
+    const currentPackageTree =
+        findEntryInMapArray(packageName, dependenciesMap);
+    const dependencyKeys: string[] =
+        Object.keys(packageObject.dependencies || {});
 
-  return packageTreeArr.sort(compare);
+    // Add each dependency to a map
+    for (const dependencyKey of dependencyKeys) {
+      if (packageObject.dependencies) {
+        if (packageObject.dependencies[dependencyKey]) {
+          newMap.set(dependencyKey, {
+            name: dependencyKey,
+            version: packageObject.dependencies[dependencyKey].version,
+            data: null,
+            dependencies: []
+          });
+        }
+      }
+    }
+
+    dependenciesMap.push(newMap);
+
+    // Step 1: Look at what the current module requires and add that to the
+    // dependencies array of our packageTree
+    const requiresKeys = Object.keys(packageObject.requires || {});
+    for (const requireKey of requiresKeys) {
+      currentPackageTree.dependencies.push(
+          findEntryInMapArray(requireKey, dependenciesMap));
+    }
+
+    // Step 2: call this method on each
+    for (const dependencyKey of dependencyKeys) {
+      if (packageObject.dependencies &&
+          packageObject.dependencies[dependencyKey]) {
+        generatePackageTreeRec(
+            dependencyKey, packageObject.dependencies[dependencyKey],
+            dependenciesMap);
+      }
+    }
+    dependenciesMap.pop();
+    return currentPackageTree;
+  }
 }
 
-/**
- * Takes in a PackageTree and populates its dependency field
- * Currently using 'any' type for pjsonLock because the types for
- * package-lock.json have not been written yet
- */
-async function populateDependencies(
-    pkg: PackageTree,
-    // tslint:disable-next-line:no-any
-    packageLockJson: any): Promise<PackageTree[]> {
-  const packageName = pkg.name;
-  if (!packageLockJson.dependencies[packageName]) {
-    return [];
-  }
-  const dependencies = packageLockJson.dependencies[packageName].requires;
-  if (!dependencies) {
-    return [];
+
+
+function findEntryInMapArray(
+    query: string, mapArray: Array<Map<string, PackageTree>>): PackageTree {
+  for (let mapIndex = mapArray.length - 1; mapIndex >= 0; mapIndex--) {
+    if (mapArray[mapIndex].has(query)) {
+      return mapArray[mapIndex].get(query)!;
+    }
   }
 
-  return await getPackageTreeFromDependencyList(dependencies, packageLockJson);
-}
-
-function compare(a: PackageTree, b: PackageTree): number {
-  if (a.name < b.name) {
-    return -1;
-  }
-  if (a.name > b.name) {
-    return 1;
-  }
-  return 0;
+  throw new Error('Module Not Found in Map Array');
 }

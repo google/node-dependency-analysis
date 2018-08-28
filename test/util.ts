@@ -41,7 +41,7 @@ interface FileDetails {
   contents: string;
 }
 
-class NVT {
+export class NVT {
   static parse(p: NameVersionTuple): {name: string, version: string} {
     return {name: p.split('@')[0], version: `${p.split('@')[1]}.0.0`};
   }
