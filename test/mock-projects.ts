@@ -15,18 +15,19 @@
  */
 
 import * as util from './util';
+
 //         *
 //     /   |   \
 //   a@1  b@1  c@2
 //    /    \
 //   c@1   c@1
-const test1 = ({
-  '*': ['a@1', 'c@2', 'b@1'],
+const project1 = {
+  '*': ['a@1', 'b@1', 'c@2'],
   'a@1': ['c@1'],
   'b@1': ['c@1'],
   'c@1': [],
   'c@2': []
-});
+};
 
 //       *
 //     /   \
@@ -35,7 +36,58 @@ const test1 = ({
 //      c@1
 //       |
 //      d@1
-const test2 = ({
+const project2 = {
+  '*': ['a@1', 'b@1'],
+  'a@1': ['c@1'],
+  'b@1': ['c@1'],
+  'c@1': ['d@1'],
+  'd@1': []
+};
+
+//       *
+//       |
+//      a@1
+//       |
+//      b@1
+//       |
+//      c@1
+//       |
+//      d@1
+const project3 = {
+  '*': ['a@1'],
+  'a@1': ['b@1'],
+  'b@1': ['c@1'],
+  'c@1': ['d@1'],
+  'd@1': []
+};
+
+//       *
+//       |
+//      a@1
+//       |
+//      b@2
+const project4 = {
+  '*': ['a@1'],
+  'a@1': ['b@1'],
+  'b@1': [],
+};
+
+//       *
+//       |
+//      a@1
+const project5 = {
+  '*': ['a@1'],
+  'a@1': []
+};
+
+//      *
+//    /    \
+//   a@1 -> b@1
+//     \   /
+//      c@1
+//       |
+//      d@1
+const project6 = ({
   '*': ['a@1', 'b@1'],
   'a@1': ['b@1', 'c@1'],
   'b@1': ['c@1'],
@@ -48,7 +100,7 @@ const test2 = ({
 //   a@1   b@1
 //     \   /
 //      c@1
-const test3 = ({
+const project7 = ({
   '*': ['a@1', 'b@1'],
   'a@1': ['c@1'],
   'b@1': ['c@1'],
@@ -60,7 +112,7 @@ const test3 = ({
 //    a@1   c@2
 //   /   \
 // b@1 -> c@1
-const test4 = ({
+const project8 = ({
   '*': ['a@1', 'c@2'],
   'a@1': ['b@1', 'c@1'],
   'b@1': ['c@1'],
@@ -72,7 +124,7 @@ const test4 = ({
 //    / \
 //   /   \
 // a@1 -> b@1
-const test5 = {
+const project9 = {
   '*': ['a@1', 'b@1'],
   'a@1': ['b@1'],
   'b@1': []
@@ -83,7 +135,7 @@ const test5 = {
 // a@1 b@1 c@1
 //   \ /
 //   c@2
-const test6 = {
+const project10 = {
   '*': ['a@1', 'b@1', 'c@1'],
   'a@1': ['c@2'],
   'b@1': ['c@2'],
@@ -96,7 +148,7 @@ const test6 = {
 //   a@1 b@1
 //    /   \
 //  c@1   c@2
-const test7 = {
+const project11 = {
   '*': ['a@1', 'b@1'],
   'a@1': ['c@1'],
   'b@1': ['c@2'],
@@ -111,7 +163,7 @@ const test7 = {
 //   a@2 c@2
 //   /
 //  c@1
-const test8 = {
+const project12 = {
   '*': ['a@1', 'b@1', 'c@1'],
   'a@1': [],
   'a@2': ['c@1'],
@@ -121,18 +173,22 @@ const test8 = {
 };
 
 // A project with no dependencies
-const test9 = {
+const project13 = {
   '*': []
 };
 
 export const testCases: {[testName: string]: util.DependencyGraph} = {
-  test1,
-  test2,
-  test3,
-  test4,
-  test5,
-  test6,
-  test7,
-  test8,
-  test9
+  project1,
+  project2,
+  project3,
+  project4,
+  project5,
+  project6,
+  project7,
+  project8,
+  project9,
+  project10,
+  project11,
+  project12,
+  project13,
 };

@@ -145,7 +145,7 @@ test(
     async t => {
       const content = 'const s = \'';
       const result = analysis.getSyntaxError(content, 'file');
-      t.notDeepEqual(result, undefined);
+      t.notDeepEqual(result, null);
       t.deepEqual(result!.type, 'Syntax Error');
     });
 

@@ -13,12 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* TODO: 1. Add more TestProjects and test them
-         2. Test methods that convert PackageTree<string> to
-             PackageTree<PointOfInterest[]>
-*/
-import test from 'ava';
+import test, {GenericTestContext} from 'ava';
 import path from 'path';
 
 import * as tree from '../src/package-tree';
@@ -28,11 +23,11 @@ import {testCases} from './mock-projects';
 import * as util from './util';
 
 test(
-    'the data property of the package tree should changed from undefined ' +
-        'to an array of Points of Interest',
+    'the data property of the package tree should ' +
+        'get the correct path to the package (test 1/3)',
     async t => {
       // See how the dependency graph looks in test-projects
-      const testProject = new util.TestProject(testCases.test1);
+      const testProject = new util.TestProject(testCases.project1);
       const testPath: string = await testProject.create();
 
       const c1 = {name: 'c', version: '1.0.0', data: null, dependencies: []};
@@ -40,57 +35,213 @@ test(
       const b1 = {name: 'b', version: '1.0.0', data: null, dependencies: [c1]};
       const a1 =
           {name: 'a', version: '1.0.0', data: null, dependencies: [b1, c1]};
-      const root: PackageTree =
+      const root: tree.PackageTree =
           {name: 'root', version: '1.0.0', data: null, dependencies: [a1, c2]};
 
-      const resolvedTree: PackageTree<string> =
+      const resolvedTree: tree.PackageTree<string> =
           await tree.resolvePaths(root, testPath);
 
-      const rootDependencies = resolvedTree.dependencies.sort(sortByName);
-      const a1Pjson =
-          require(path.join(rootDependencies[0].data, 'package.json'));
-      t.deepEqual(a1Pjson.name, 'a');
-      t.deepEqual(a1Pjson.version, '1.0.0');
-      const c2Pjson =
-          require(path.join(rootDependencies[1].data, 'package.json'));
-      t.deepEqual(c2Pjson.name, 'c');
-      t.deepEqual(c2Pjson.version, '2.0.0');
-
-      const a1Dependencies = rootDependencies[0].dependencies.sort(sortByName);
-      const b1Pjson =
-          require(path.join(a1Dependencies[0].data, 'package.json'));
-      t.deepEqual(b1Pjson.name, 'b');
-      t.deepEqual(b1Pjson.version, '1.0.0');
-      const c1Pjson1 =
-          require(path.join(a1Dependencies[1].data, 'package.json'));
-      t.deepEqual(c1Pjson1.name, 'c');
-      t.deepEqual(c1Pjson1.version, '1.0.0');
-
-      const b1Dependencies = a1Dependencies[0].dependencies.sort(sortByName);
-      const c1Pjson2 =
-          require(path.join(b1Dependencies[0].data, 'package.json'));
-      t.deepEqual(c1Pjson2.name, c1Pjson2.name);
-      t.deepEqual(c1Pjson2.version, c1Pjson2.version);
+      checkPjsons(resolvedTree, t, testCases.project1);
 
       testProject.cleanup();
     });
 
-/* TODO: test2
-test('', async t => {
-  // See how the dependency graph looks in test-projects
-  const testPath: string = await tests.test2.create();
-  tests.test2.cleanup();
-});*/
+test(
+    'the data property of the package tree should ' +
+        'get the correct path to the package (test 2/3)',
+    async t => {
+      const test = new util.TestProject(testCases.project2);
+      const testPath: string = await test.create();
+      const d1 = {name: 'd', version: '1.0.0', data: null, dependencies: []};
+      const c1 = {name: 'c', version: '1.0.0', data: null, dependencies: [d1]};
+      const b1 = {name: 'b', version: '1.0.0', data: null, dependencies: [c1]};
+      const a1 = {name: 'a', version: '1.0.0', data: null, dependencies: [c1]};
+      const root =
+          {name: 'root', version: '1.0.0', data: null, dependencies: [a1, b1]};
+      const resolvedTree: tree.PackageTree<string> =
+          await tree.resolvePaths(root, testPath);
+      checkPjsons(resolvedTree, t, testCases.project2);
 
-function sortByName(a: PackageTree<string>, b: PackageTree<string>) {
-  if (a.name < b.name) {
-    return -1;
-  } else {
-    return 1;
-  }
-}
+      test.cleanup();
+    });
 
+test(
+    'the data property of the package tree should ' +
+        'get the correct path to the package (test 3/3)',
+    async t => {
+      const test = new util.TestProject(testCases.project3);
+      const testPath: string = await test.create();
+      const d1 = {name: 'd', version: '1.0.0', data: null, dependencies: []};
+      const c1 = {name: 'c', version: '1.0.0', data: null, dependencies: [d1]};
+      const b1 = {name: 'b', version: '1.0.0', data: null, dependencies: [c1]};
+      const a1 = {name: 'a', version: '1.0.0', data: null, dependencies: [b1]};
+      const root =
+          {name: 'root', version: '1.0.0', data: null, dependencies: [a1]};
 
+      const resolvedTree: tree.PackageTree<string> =
+          await tree.resolvePaths(root, testPath);
+      checkPjsons(resolvedTree, t, testCases.project3);
+      test.cleanup();
+    });
+
+test(
+    'getJSFiles should not get files in a project\'s dependencies', async t => {
+      const test = new util.TestProject(testCases.project4);
+      test.addFile('b@1', './src/src2/index.js', 'console.log()');
+      test.addFile('b@1', './util.ts', 'console.log()');
+      test.addFile('b@1', './build/cli.js', 'console.log()');
+      const testPath: string = await test.create();
+      const a1Dir = path.join(testPath, 'a@1');
+      const a1Files = await tree.getJSFiles(a1Dir);
+      t.false(
+          a1Files.includes(path.join('node_modules', 'b@1/src/src2/index.js')));
+      test.cleanup();
+    });
+
+test(
+    'getJSFiles should get only JS files (not directories) in its directory ',
+    async t => {
+      const test = new util.TestProject(testCases.project4);
+      test.addFile('b@1', './src/src2/index.js', 'console.log()');
+      test.addFile('b@1', './util.ts', 'console.log()');
+      test.addFile('b@1', './build/cli.js', 'console.log()');
+      const testPath: string = await test.create();
+      const b1Dir = path.join(testPath, 'b@1');
+      const b1Files = await tree.getJSFiles(b1Dir);
+      t.true(b1Files.includes(path.join(b1Dir, 'src/src2/index.js')));
+      t.true(b1Files.includes(path.join(b1Dir, 'build/cli.js')));
+      t.false(b1Files.includes(path.join(b1Dir, 'util.ts')));
+      t.false(b1Files.includes(path.join(b1Dir, 'package.json')));
+      t.false(b1Files.includes(path.join(b1Dir, 'node_modules')));
+      t.false(b1Files.includes(path.join(b1Dir, 'src')));
+      t.false(b1Files.includes(path.join(b1Dir, 'src/src2')));
+      t.false(b1Files.includes(path.join(b1Dir, 'build')));
+      test.cleanup();
+    });
+
+test(
+    'the package tree should be populated with Points of Interest', async t => {
+      const test = new util.TestProject(testCases.project5);
+      test.addFile('a@1', './file1.js', 'const r = require;\n');
+      test.addFile('a@1', './file2.js', 'const h = require(\'http\');');
+      const testPath: string = await test.create();
+      const p = path.join(testPath, 'a@1');
+      const n = {name: 'a', version: '1.0.0', data: p, dependencies: []};
+      const updatedA1Node = await tree.populatePOIInPackageTree(n);
+      t.deepEqual(updatedA1Node.data.length, 2);
+      t.true(updatedA1Node.data.some((pkg) => {
+        return pkg.type === 'Dynamic Require Call' &&
+            pkg.fileName === path.join(p, 'file1.js');
+      }));
+      t.true(updatedA1Node.data.some((pkg) => {
+        return pkg.type === 'http' && pkg.fileName === path.join(p, 'file2.js');
+      }));
+      test.cleanup();
+    });
+
+test(
+    'the package tree should return only a syntax poi for a ' +
+        'file if there is a syntax error',
+    async t => {
+      const test = new util.TestProject(testCases.project5);
+      test.addFile('a@1', './file1.js', 'const r = require;\n const s = \'');
+      test.addFile('a@1', './file2.js', 'const net = require(\'net\');');
+      const testPath: string = await test.create();
+      const a1Path = path.join(testPath, 'a@1');
+      const a1Node =
+          {name: 'a', version: '1.0.0', data: a1Path, dependencies: []};
+      const updatedA1Node = await tree.populatePOIInPackageTree(a1Node);
+      t.deepEqual(updatedA1Node.data.length, 2);
+      t.true(updatedA1Node.data.some((pkg) => {
+        return pkg.type === 'Syntax Error' &&
+            pkg.fileName === path.join(a1Path, 'file1.js');
+      }));
+      t.false(updatedA1Node.data.some((pkg) => {
+        return pkg.type === 'Dynamic Require Call' &&
+            pkg.fileName === path.join(a1Path, 'file1.js');
+      }));
+      t.true(updatedA1Node.data.some((pkg) => {
+        return pkg.type === 'net' &&
+            pkg.fileName === path.join(a1Path, 'file2.js');
+      }));
+      test.cleanup();
+    });
+
+test(
+    'generatePackageTree throws an error if it can not find a file',
+    async t => {
+      const fakeReadFilep = () => {
+        throw new Error('File Not Found');
+      };
+
+      await t.throws(
+          tree.generatePackageTree('.', fakeReadFilep), Error,
+          'File Not Found');
+    });
+
+test(
+    'end-to-end: should generate a package tree with points of interest',
+    async t => {
+      const test = new util.TestProject(testCases.project1);
+      test.addFile('a@1', './a1File1.js', 'const r = require;\n const s = \'');
+      test.addFile('a@1', './a1File2.js', 'const net = require(\'net\');');
+      test.addFile('c@2', './c2File1.js', 'console.log(\'this file is ok\');');
+      test.addFile('c@1', './c1File1.js', 'console.log(\'this file is ok\')');
+      test.addFile('c@1', './c1File2.js', 'const r = require(\'fs\')');
+      const testPath = await test.create();
+      const emptyPackageTree = await tree.generatePackageTree(testPath);
+      const packageTreeWithPath =
+          await tree.resolvePaths(emptyPackageTree, testPath);
+      const packageTreeWithPOI =
+          await tree.populatePOIInPackageTree(packageTreeWithPath);
+
+      // a@1 tests
+      const a1Package = packageTreeWithPOI.dependencies.filter((dep) => {
+        return dep.name === 'a' && dep.version === 'file:a@1';
+      });
+      t.deepEqual(a1Package[0].dependencies.length, 1);
+      const a1Data = a1Package[0].data;
+      t.deepEqual(a1Data.length, 2);
+      t.true(a1Data.some((pkg) => {
+        return pkg.type === 'Syntax Error' &&
+            pkg.fileName === path.join(testPath, 'node_modules/a/a1File1.js');
+      }));
+      t.true(a1Data.some((pkg) => {
+        return pkg.type === 'net' &&
+            pkg.fileName === path.join(testPath, 'node_modules/a/a1File2.js');
+      }));
+
+      // c@2 tests
+      const c2Folder = packageTreeWithPOI.dependencies.filter((dep) => {
+        return dep.name === 'c' && dep.version === 'file:c@2';
+      });
+      t.deepEqual(c2Folder[0].dependencies.length, 0);
+      const c2Data = c2Folder[0].data;
+      t.deepEqual(c2Data.length, 0);
+
+      // c@1 tests
+      const c1Package = a1Package[0].dependencies.filter((dep) => {
+        return dep.name === 'c' && dep.version === 'file:c@1';
+      });
+      t.deepEqual(c1Package[0].dependencies.length, 0);
+      const c1Data = c1Package[0].data;
+      t.deepEqual(c1Data.length, 1);
+      t.true(c1Data.some((pkg) => {
+        return pkg.type === 'fs' &&
+            pkg.fileName ===
+            path.join(testPath, 'node_modules/a/node_modules/c/c1File2.js');
+      }));
+
+      // b@1 tests
+      const b1Package = packageTreeWithPOI.dependencies.filter((dep) => {
+        return dep.name === 'b' && dep.version === 'file:b@1';
+      });
+      t.deepEqual(b1Package[0].dependencies.length, 1);
+      const b1Data = b1Package[0].data;
+      t.deepEqual(b1Data.length, 0);
+
+      test.cleanup();
+    });
 
 test(
     'generatePackageTree should return a populated PackageTree given a project name and its root directory',
@@ -103,20 +254,9 @@ test(
     });
 
 test(
-    'generatePackageTree throws an error if it can not find a file',
-    async t => {
-      const fakeReadFilep = () => {
-        throw new Error('File Not Found');
-      };
-
-      await t.throws(
-          generatePackageTree('.', fakeReadFilep), Error, 'File Not Found');
-    });
-
-test(
     'generatePackageTree does not create duplicates of the same module when multiple modules depend on it',
     async t => {
-      const testProject = new util.TestProject(testCases.test3);
+      const testProject = new util.TestProject(testCases.project7);
       const testPath = await testProject.create();
       const packageTreeResult = await generatePackageTree(testPath);
       t.true(
@@ -199,4 +339,43 @@ interface TestResults {
   testProjectPath: string;
   actualResult: tree.PackageTree<null>;
   expectedResult: tree.PackageTree<null>;
+}
+
+/**
+ * Recursive function that creates a map of packages where the key is the
+ * name and version, and the value is the corresponding package tree
+ *
+ * @param pkg the current package tree
+ * @param map the map holding resolved packages
+ */
+function createPackageMap(
+    pkg: tree.PackageTree<string>, map: Map<string, tree.PackageTree<string>>) {
+  pkg.dependencies.forEach((p) => {
+    createPackageMap(p, map);
+  });
+  map.set(`${pkg.name}@${pkg.version}`, pkg);
+  return map;
+}
+
+/**
+ * Checks that all nodes in a package tree hold the correct path
+ *
+ * @param pkg the root of the package tree
+ * @param t the object used for tests
+ * @param project an object that lists package dependents and dependencies
+ */
+function checkPjsons<T>(
+    pkg: tree.PackageTree<string>, t: GenericTestContext<T>,
+    project: util.DependencyGraph) {
+  let map = new Map<string, tree.PackageTree<string>>();
+  map = createPackageMap(pkg, map);
+
+  for (const key in project) {
+    if (key !== '*') {
+      const pkg = map.get(`${key}.0.0`);
+      t.notDeepEqual(pkg, undefined);
+      const pjson = require(path.join(pkg!.data, 'package.json'));
+      t.deepEqual(`${pjson.name}@${pjson.version}`, `${key}.0.0`);
+    }
+  }
 }
