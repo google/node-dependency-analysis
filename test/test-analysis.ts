@@ -15,7 +15,7 @@
  */
 
 import test from 'ava';
-import * as analysis from '../src/analysis';
+import * as analysis from '../src/detection-functions';
 
 test(
     'getIOModules should detect http module in standard require http case',

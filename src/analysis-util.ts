@@ -22,127 +22,9 @@ import {PointOfInterest, Position} from './package-tree';
 
 const walk = require('acorn/dist/walk');
 
-enum IdType {
+export enum IdType {
   CALLEE,
   OBJECT
-}
-
-/**
- * Gets a list of PointOfInterest objects, indicating that there were IO
- * modules that were required in a file
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getIOModules(
-    contents: string, file: string): PointOfInterest[] {
-  const ioModuleList: string[] =
-      ['http', 'fs', 'https', 'http2', 'net', 'datagram'];
-  const found = findModules(contents, file, ioModuleList);
-  return found;
-}
-
-/**
- * Gets a list of PointOfInterest objects, indicating that there were
- * required modules that can execute arbitrary code
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getArbitraryExecutionMods(
-    contents: string, file: string): PointOfInterest[] {
-  const arbitraryExecutionMods: string[] =
-      ['child_process', 'repl', 'vm', 'module'];
-  const found = findModules(contents, file, arbitraryExecutionMods);
-
-  return found;
-}
-
-/**
- * Gets a list of PointOfInterest objects, indicating that dynamic
- * evaluation was used in the file
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getDynamicRequires(
-    contents: string, file: string): PointOfInterest[] {
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
-
-  const requireAliasPOIs: PointOfInterest[] = [];
-
-  const requireAliasCalls: Position[] =
-      locateAliases(acornTree, 'require', IdType.CALLEE);
-  requireAliasCalls.forEach((pos) => {
-    const requireAliasPOI = createPOI('Dynamic Require Call', file, pos);
-    requireAliasPOIs.push(requireAliasPOI);
-  });
-
-  const requireCalls = findCallee('require', acornTree);
-  const dynamicRequireArgs: PointOfInterest[] =
-      getRequiredModules(requireCalls, file, true);
-
-  return [...requireAliasPOIs, ...dynamicRequireArgs];
-}
-
-/**
- * Creates a Point of Interest object if there are syntax error(s) in a file
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getSyntaxError(contents: string, file: string): PointOfInterest|
-    null {
-  try {
-    acorn.parse(contents, {allowHashBang: true, locations: true});
-  } catch (err) {
-    const pos = {lineStart: 0, lineEnd: 0, colStart: 0, colEnd: 0};
-    const syntaxError = createPOI('Syntax Error', file, pos);
-    return syntaxError;
-  }
-  return null;
-}
-
-/**
- * Gets a list of PointOfInterest objects that indicate usages of eval
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getEvalCalls(
-    contents: string, file: string): PointOfInterest[] {
-  const evalPOIs: PointOfInterest[] = [];
-
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
-  const foundStandardEvalCalls: Node[] = findCallee('eval', acornTree);
-  foundStandardEvalCalls.forEach((node) => {
-    const evalPOI = createPOI('Eval Call', file, getPosition(node));
-    evalPOIs.push(evalPOI);
-  });
-
-  const positionsOfAliases: Position[] =
-      locateAliases(acornTree, 'eval', IdType.CALLEE);
-  positionsOfAliases.forEach((pos) => {
-    const evalPOI = createPOI('Eval Call', file, pos);
-    evalPOIs.push(evalPOI);
-  });
-  return evalPOIs;
-}
-
-/**
- * Returns Points Of Interest that indicate uses of process.env and
- * dynamic calls to process and the properties in process
- *
- * @param contents the contents of the file
- * @param file the name of the file being checked
- */
-export function getEnvAccesses(
-    contents: string, file: string): PointOfInterest[] {
-  const envAccesses: PointOfInterest[] =
-      getAccesses('process', 'env', contents, file);
-  return envAccesses;
 }
 
 /**
@@ -152,7 +34,7 @@ export function getEnvAccesses(
  * @param id the identifier that is being searched for
  * @param tree abstract syntax tree
  */
-function findCallee(id: string, tree: Node): Node[] {
+export function findCallee(id: string, tree: Node): Node[] {
   const calleeUsages: Node[] = [];
   walk.simple(tree, {
     CallExpression(e: CallExpression) {
@@ -171,7 +53,7 @@ function findCallee(id: string, tree: Node): Node[] {
  * @param name the name of the object
  * @param tree abstract syntax tree
  */
-function findObject(name: string, tree: Node): MemberExpression[] {
+export function findObject(name: string, tree: Node): MemberExpression[] {
   const objectUsages: MemberExpression[] = [];
   walk.simple(tree, {
     MemberExpression(e: MemberExpression) {
@@ -192,7 +74,7 @@ function findObject(name: string, tree: Node): MemberExpression[] {
  * @param contents the contents of the file
  * @param file the file being checked
  */
-function getAccesses(
+export function getAccesses(
     object: string, property: string, contents: string, file: string) {
   const accesses: PointOfInterest[] = [];
   const acornTree =
@@ -230,7 +112,7 @@ function getAccesses(
  *     true: Points Of Interest array of dynamic accesses to any property
  *     false: Points Of Interest array of accesses to the property
  */
-function locatePropertyAccesses(
+export function locatePropertyAccesses(
     property: string, nodes: MemberExpression[], dynamic = false) {
   const locationsOfPropAccesses: Position[] = [];
   const obscuredProps: Position[] = [];
@@ -276,7 +158,7 @@ function locatePropertyAccesses(
  *     true: an array of Points Of Interest with dynamic arguments
  *     false: an array of Points Of Interest with modules being required
  */
-function getRequiredModules(
+export function getRequiredModules(
     requireNodes: Node[], file: string, dynamic = false): PointOfInterest[] {
   const requiredModules: PointOfInterest[] = [];
   const dynamicEvalModules: PointOfInterest[] = [];
@@ -306,8 +188,7 @@ function getRequiredModules(
  *
  * @param node the AST node containing the string argument
  */
-// TODO: rename this?
-function getArgument(node: Node): string|null {
+export function getArgument(node: Node): string|null {
   if (node.type === 'Literal' && node.value) {
     const ioMod = node.value.toString();
     return ioMod;
@@ -348,7 +229,8 @@ function getArgument(node: Node): string|null {
  * @param file the file being checked
  * @param moduleList the array of modules that are being searched for
  */
-function findModules(contents: string, file: string, moduleList: string[]) {
+export function findModules(
+    contents: string, file: string, moduleList: string[]) {
   const acornTree =
       acorn.parse(contents, {locations: true, allowHashBang: true});
   const requireCalls = findCallee('require', acornTree);
@@ -366,7 +248,8 @@ function findModules(contents: string, file: string, moduleList: string[]) {
  * @param tree abstract syntax tree
  * @param file the name of the file being checked
  */
-function locateAliases(tree: Node, id: string, type: IdType): Position[] {
+export function locateAliases(
+    tree: Node, id: string, type: IdType): Position[] {
   const positions: Position[] = [];
   walk.fullAncestor(tree, (n: Node, ancestors: Node[]) => {
     if (n && n.type === 'Identifier') {
@@ -396,7 +279,7 @@ function locateAliases(tree: Node, id: string, type: IdType): Position[] {
  *
  * @param node node that position will be retrieved from
  */
-function getPosition(node: Node): Position {
+export function getPosition(node: Node): Position {
   const pos: Position = {lineStart: 0, lineEnd: 0, colStart: 0, colEnd: 0};
   if (node.loc) {
     pos.lineStart = node.loc.start.line, pos.lineEnd = node.loc.end.line,
@@ -412,7 +295,7 @@ function getPosition(node: Node): Position {
  * @param file the file in which the poi is located
  * @param position the location in the file that the poi is located
  */
-function createPOI(
+export function createPOI(
     type: string, fileName: string, position: Position): PointOfInterest {
   return {type, fileName, position};
 }
