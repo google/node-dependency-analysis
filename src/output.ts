@@ -20,17 +20,27 @@ import {PackageTree, PointOfInterest} from './package-tree';
 
 // File to output to user
 export function outputToUser(packageTree: PackageTree<PointOfInterest[]>) {
-  const sortedModules = flattenPackageTree(packageTree).sort(compare);
+  const sortedModules =
+      flattenPackageTree(
+          packageTree, new Map<string, PackageTree<PointOfInterest[]>>())
+          .sort(compare);
   console.log(output(sortedModules));
 }
 
-function flattenPackageTree(packageTree: PackageTree<PointOfInterest[]>):
+function flattenPackageTree(
+    packageTree: PackageTree<PointOfInterest[]>,
+    flattenedTrees: Map<string, PackageTree<PointOfInterest[]>>):
     Array<PackageTree<PointOfInterest[]>> {
   const combined: Array<PackageTree<PointOfInterest[]>> = [];
-  combined.push(packageTree);
-  packageTree.dependencies.forEach((dep) => {
-    combined.push(...flattenPackageTree(dep));
-  });
+  // Check to make sure that this packageTree has not already been added
+  if (!flattenedTrees.has(`${packageTree.name} ${packageTree.version}`)) {
+    combined.push(packageTree);
+    flattenedTrees.set(
+        `${packageTree.name} ${packageTree.version}`, packageTree);
+    packageTree.dependencies.forEach((dep) => {
+      combined.push(...flattenPackageTree(dep, flattenedTrees));
+    });
+  }
   return combined;
 }
 
@@ -45,8 +55,7 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
     }
 
     packageTree.data.forEach((data) => {
-      arrOfStrings.push(`     Type: ${data.type}, Location: ${data.fileName}:${
-          data.position.lineStart}`);
+      arrOfStrings.push(`     Type: ${data.type}`);
     });
   });
 
