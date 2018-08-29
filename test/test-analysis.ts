@@ -224,6 +224,11 @@ test(
           '(k => process[\'env\'][k]));';
       const result3 = analysis.getEnvAccesses(content3, 'file');
       t.deepEqual(result3.length, 2);
+
+      const content4 = 'process[`${\'env\'}`]';
+      const result4 = analysis.getEnvAccesses(content4, 'file');
+      t.deepEqual(result4.length, 1);
+      t.deepEqual(result4[0].type, 'Access to process.env');
     });
 
 test('getEnvAccesses should return pois for obscured properties', async t => {
@@ -231,6 +236,11 @@ test('getEnvAccesses should return pois for obscured properties', async t => {
   const result1 = analysis.getEnvAccesses(content1, 'file');
   t.deepEqual(result1.length, 1);
   t.deepEqual(result1[0].type, 'Obscured process property');
+
+  const content2 = 'process[`e${middle}v`]';
+  const result2 = analysis.getEnvAccesses(content2, 'file');
+  t.deepEqual(result2.length, 1);
+  t.deepEqual(result2[0].type, 'Obscured process property');
 });
 
 test(

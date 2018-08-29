@@ -67,7 +67,7 @@ export function findObject(name: string, tree: Node): MemberExpression[] {
 
 /**
  * Detects and creates POIs for accesses to the specified property of the
- * object, obscured accesses to the object, and its properties
+ * object
  *
  * @param object the name of the object
  * @param property the name of the property
@@ -87,35 +87,47 @@ export function getAccesses(
     accesses.push(createPOI(`Access to ${object}.${property}`, file, pos));
   });
 
+  return accesses;
+}
+
+/**
+ * Detects and creates POIs for obscured accesses to the object,
+ * and its properties
+ *
+ * @param object the name of the object
+ * @param contents the contents of the file
+ * @param file the file being checked
+ */
+export function getDynamicAccesses(
+    object: string, contents: string, file: string) {
+  const dynamicAccesses: PointOfInterest[] = [];
+  const acornTree =
+      acorn.parse(contents, {allowHashBang: true, locations: true});
+  const objectUsages: MemberExpression[] = findObject(object, acornTree);
   const obscuredProperties: Position[] =
-      locatePropertyAccesses(property, objectUsages, true);
+      locateIndexPropertyAccesses(objectUsages);
   obscuredProperties.forEach((pos) => {
-    accesses.push(createPOI(`Obscured ${object} property`, file, pos));
+    dynamicAccesses.push(createPOI(`Obscured ${object} property`, file, pos));
   });
 
   const obscuredObjects: Position[] =
       locateAliases(acornTree, object, IdType.OBJECT);
   obscuredObjects.forEach((pos) => {
-    accesses.push(createPOI(`Obscured ${object} object`, file, pos));
+    dynamicAccesses.push(createPOI(`Obscured ${object} object`, file, pos));
   });
-
-  return accesses;
+  return dynamicAccesses;
 }
 
 /**
- * Locates accesses to a specific property given nodes that contain the
+ * Locates accesses to a specific property given AST nodes that contain the
  * object that contains the property.
  *
  * @param property the name of the property being looked for
  * @param nodes the nodes of an AST that contain the object with the property
- * @param dynamic changes the returned object
- *     true: Points Of Interest array of dynamic accesses to any property
- *     false: Points Of Interest array of accesses to the property
  */
 export function locatePropertyAccesses(
-    property: string, nodes: MemberExpression[], dynamic = false) {
+    property: string, nodes: MemberExpression[]) {
   const locationsOfPropAccesses: Position[] = [];
-  const obscuredProps: Position[] = [];
   nodes.forEach((n) => {
     const pos: Position = getPosition(n);
 
@@ -126,25 +138,34 @@ export function locatePropertyAccesses(
       }
 
       // Indexing into object
-    } else if (n.property.type === 'Literal') {
+    } else {
       const arg = getArgument(n.property);
       if (arg === property) {
         locationsOfPropAccesses.push(pos);
-      } else if (arg === null) {
-        obscuredProps.push(pos);
       }
-
-      // Anything with any type other than Literal and Identifier
-    } else {
-      obscuredProps.push(pos);
     }
   });
 
-  if (dynamic) {
-    return obscuredProps;
-  } else {
-    return locationsOfPropAccesses;
-  }
+  return locationsOfPropAccesses;
+}
+
+/**
+ * Locates dynamic accesses of an object and its properties given AST nodes
+ *
+ * @param nodes the nodes of an AST that contain the object with the property
+ */
+export function locateIndexPropertyAccesses(nodes: MemberExpression[]):
+    Position[] {
+  const indexPropsPos: Position[] = [];
+  nodes.forEach((n) => {
+    const pos: Position = getPosition(n);
+
+    const arg = getArgument(n.property);
+    if (arg === null && n.property.type !== 'Identifier') {
+      indexPropsPos.push(pos);
+    }
+  });
+  return indexPropsPos;
 }
 
 /**

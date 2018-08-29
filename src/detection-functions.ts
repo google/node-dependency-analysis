@@ -146,5 +146,7 @@ export function getEnvAccesses(
     contents: string, file: string): PointOfInterest[] {
   const envAccesses: PointOfInterest[] =
       analysisUtil.getAccesses('process', 'env', contents, file);
-  return envAccesses;
+  const obscuredProcessAccesses: PointOfInterest[] =
+      analysisUtil.getDynamicAccesses('process', contents, file);
+  return [...envAccesses, ...obscuredProcessAccesses];
 }
