@@ -15,7 +15,6 @@
  */
 
 // This file will hold all the functions that do analysis of packages.
-import * as acorn from 'acorn';
 import {CallExpression, MemberExpression, Node} from 'estree';
 
 import {PointOfInterest, Position} from './package-tree';
@@ -75,10 +74,8 @@ export function findObject(name: string, tree: Node): MemberExpression[] {
  * @param file the file being checked
  */
 export function getAccesses(
-    object: string, property: string, contents: string, file: string) {
+    object: string, property: string, acornTree: Node, file: string) {
   const accesses: PointOfInterest[] = [];
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
 
   const objectUsages: MemberExpression[] = findObject(object, acornTree);
   const positionsOfPropAccesses: Position[] =
@@ -99,10 +96,8 @@ export function getAccesses(
  * @param file the file being checked
  */
 export function getDynamicAccesses(
-    object: string, contents: string, file: string) {
+    object: string, acornTree: Node, file: string) {
   const dynamicAccesses: PointOfInterest[] = [];
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
   const objectUsages: MemberExpression[] = findObject(object, acornTree);
   const obscuredProperties: Position[] =
       locateIndexPropertyAccesses(objectUsages);
@@ -251,9 +246,7 @@ export function getArgument(node: Node): string|null {
  * @param moduleList the array of modules that are being searched for
  */
 export function findModules(
-    contents: string, file: string, moduleList: string[]) {
-  const acornTree =
-      acorn.parse(contents, {locations: true, allowHashBang: true});
+    acornTree: Node, file: string, moduleList: string[]) {
   const requireCalls = findCallee('require', acornTree);
   const modulesFound = getRequiredModules(requireCalls, file, false);
   const requiredModules =

@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
+import * as acorn from 'acorn';
 import test from 'ava';
+
 import * as analysis from '../src/detection-functions';
 
 test(
     'getIOModules should detect http module in standard require http case',
     async t => {
       const content = 'const a = require(\'http\');';
-      const result = analysis.getIOModules(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getIOModules(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'http');
     });
@@ -31,17 +34,20 @@ test(
         'require calls',
     async t => {
       const content1 = 'console.log(\'http\')';
-      const result1 = analysis.getIOModules(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getIOModules(acornTree1, 'file');
       t.deepEqual(result1.length, 0);
 
       const content2 = 'const a = \'require(\\\'http\\\')\';';
-      const result2 = analysis.getIOModules(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getIOModules(acornTree2, 'file');
       t.deepEqual(result2.length, 0);
     });
 
 test('getIOModules should not detect contain util modules', async t => {
   const content = 'const a = require(\'util\');\nconst b = require(\'path\');';
-  const result = analysis.getIOModules(content, 'file');
+  const acornTree = parse(content);
+  const result = analysis.getIOModules(acornTree, 'file');
   t.deepEqual(result.length, 0);
 });
 
@@ -50,12 +56,14 @@ test(
         'template literals',
     async t => {
       const content1 = 'const a = require(`${\'http\'}`);';
-      const result1 = analysis.getIOModules(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getIOModules(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'http');
 
       const content2 = 'const a = require(`http`);';
-      const result2 = analysis.getIOModules(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getIOModules(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'http');
     });
@@ -63,7 +71,8 @@ test(
 test('getIOModules should detect both http and fs module', async t => {
   const content =
       'const a = require(\'http\');\n const b = require(`${\'fs\'}`);';
-  const result = analysis.getIOModules(content, 'file');
+  const acornTree = parse(content);
+  const result = analysis.getIOModules(acornTree, 'file');
   t.deepEqual(result.length, 2);
   t.deepEqual(result[0].type, 'http');
   t.deepEqual(result[1].type, 'fs');
@@ -73,22 +82,26 @@ test(
     'getArbitraryExecutionMods should detect child_process, repl, vm, module',
     async t => {
       const content1 = 'const a = require(\'child_process\');';
-      const result1 = analysis.getArbitraryExecutionMods(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getArbitraryExecutionMods(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'child_process');
 
       const content2 = 'const b = require(\'repl\');';
-      const result2 = analysis.getArbitraryExecutionMods(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getArbitraryExecutionMods(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'repl');
 
       const content3 = 'require(\'vm\').runInNewContext(\'doSomething();\')';
-      const result3 = analysis.getArbitraryExecutionMods(content3, 'file');
+      const acornTree3 = parse(content3);
+      const result3 = analysis.getArbitraryExecutionMods(acornTree3, 'file');
       t.deepEqual(result3.length, 1);
       t.deepEqual(result3[0].type, 'vm');
 
       const content4 = 'const b = require(\'module\');';
-      const result4 = analysis.getArbitraryExecutionMods(content4, 'file');
+      const acornTree4 = parse(content4);
+      const result4 = analysis.getArbitraryExecutionMods(acornTree4, 'file');
       t.deepEqual(result4.length, 1);
       t.deepEqual(result4[0].type, 'module');
     });
@@ -98,7 +111,8 @@ test(
         'as a dyanmic require arg',
     async t => {
       const content = 'const a = require(\'h\' + \'t\' + \'t\' + \'p\');';
-      const result = analysis.getDynamicRequires(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getDynamicRequires(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
@@ -109,12 +123,14 @@ test(
     async t => {
       const content1 =
           `const a = \'anotherhttp\'\nconst b = require(a.substring(6));`;
-      const result1 = analysis.getDynamicRequires(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getDynamicRequires(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'Dynamic Require Arg');
 
       const content2 = 'const a = require(\'anotherhttp\'.substring(6))';
-      const result2 = analysis.getDynamicRequires(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getDynamicRequires(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Dynamic Require Arg');
     });
@@ -125,7 +141,8 @@ test(
     async t => {
       const content =
           'function returnHttp(){return \'http\';}\nconst a = require(returnHttp);';
-      const result = analysis.getDynamicRequires(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getDynamicRequires(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
@@ -136,7 +153,8 @@ test(
       const content = `function something(){ return 1;}
                         const a = require; 
                         const b = a(\'https\');`;
-      const result = analysis.getDynamicRequires(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getDynamicRequires(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
@@ -147,7 +165,8 @@ test(
     async t => {
       const content =
           'function returnRequire(){return require;}\n const a = returnRequire();\nconst b = a(\'http\');';
-      const result = analysis.getDynamicRequires(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getDynamicRequires(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
@@ -158,7 +177,8 @@ test(
     async t => {
       const content =
           'function f(a, b){return a(b)}\nconst a = f(require, \'http\');';
-      const result = analysis.getDynamicRequires(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getDynamicRequires(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Call');
     });
@@ -184,7 +204,8 @@ test(
 
 test('getEvalCalls should return pois for standard eval() usages', async t => {
   const content = 'const e = eval(doSomethingBad())';
-  const result = analysis.getEvalCalls(content, 'file');
+  const acornTree = parse(content);
+  const result = analysis.getEvalCalls(acornTree, 'file');
   t.deepEqual(result.length, 1);
   t.deepEqual(result[0].type, 'Eval Call');
 });
@@ -193,14 +214,16 @@ test(
     'getEvalCalls should return pois for eval identifiers under aliases',
     async t => {
       const content1 = 'const e = eval; e(doSomethingBad());';
-      const result1 = analysis.getEvalCalls(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getEvalCalls(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'Eval Call');
 
       const content2 =
           'doSomethingBad(eval); function doSomethingBad(something)' +
           '{something(doSomethingReallyBad());}';
-      const result2 = analysis.getEvalCalls(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getEvalCalls(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Eval Call');
     });
@@ -210,35 +233,41 @@ test(
         'property in the process object',
     async t => {
       const content1 = 'const r = process.env.SOME_TOKEN';
-      const result1 = analysis.getEnvAccesses(content1, 'file');
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getEnvAccesses(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'Access to process.env');
 
 
       const content2 = 'const r = process[\'env\'].SOME_TOKEN';
-      const result2 = analysis.getEnvAccesses(content2, 'file');
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getEnvAccesses(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Access to process.env');
 
       const content3 = 'doBadThings(Object.keys(process[\'env\']).map' +
           '(k => process[\'env\'][k]));';
-      const result3 = analysis.getEnvAccesses(content3, 'file');
+      const acornTree3 = parse(content3);
+      const result3 = analysis.getEnvAccesses(acornTree3, 'file');
       t.deepEqual(result3.length, 2);
 
       const content4 = 'process[`${\'env\'}`]';
-      const result4 = analysis.getEnvAccesses(content4, 'file');
+      const acornTree4 = parse(content4);
+      const result4 = analysis.getEnvAccesses(acornTree4, 'file');
       t.deepEqual(result4.length, 1);
       t.deepEqual(result4[0].type, 'Access to process.env');
     });
 
 test('getEnvAccesses should return pois for obscured properties', async t => {
   const content1 = 'const r = process[\'e\' + \'n\' + \'v\']';
-  const result1 = analysis.getEnvAccesses(content1, 'file');
+  const acornTree1 = parse(content1);
+  const result1 = analysis.getEnvAccesses(acornTree1, 'file');
   t.deepEqual(result1.length, 1);
   t.deepEqual(result1[0].type, 'Obscured process property');
 
   const content2 = 'process[`e${middle}v`]';
-  const result2 = analysis.getEnvAccesses(content2, 'file');
+  const acornTree2 = parse(content2);
+  const result2 = analysis.getEnvAccesses(acornTree2, 'file');
   t.deepEqual(result2.length, 1);
   t.deepEqual(result2[0].type, 'Obscured process property');
 });
@@ -248,7 +277,8 @@ test(
     async t => {
       const content = 'doSomething(process); function doSomething(s)' +
           '{return s.env.NPM_TOKEN;}';
-      const result = analysis.getEnvAccesses(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getEnvAccesses(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Obscured process object');
     });
@@ -258,6 +288,11 @@ test(
         'properties of process are being accessed',
     async t => {
       const content = 'const arvs = process.argv;';
-      const result = analysis.getEnvAccesses(content, 'file');
+      const acornTree = parse(content);
+      const result = analysis.getEnvAccesses(acornTree, 'file');
       t.deepEqual(result.length, 0);
     });
+
+function parse(contents: string) {
+  return acorn.parse(contents, {allowHashBang: true, locations: true});
+}
