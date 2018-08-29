@@ -16,6 +16,7 @@
 
 import semver from 'semver';
 
+import {getNumberOfTransitiveDetections} from './output-util';
 import {PackageTree, PointOfInterest} from './package-tree';
 
 // File to output to user
@@ -47,8 +48,11 @@ function flattenPackageTree(
 function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
   const arrOfStrings: string[] = [];
   packageTrees.forEach((packageTree) => {
-    arrOfStrings.push(
-        `Name: ${packageTree.name}, Version: ${packageTree.version}`);
+    arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
+        packageTree.data.length} Immediate ${
+        getNumberOfTransitiveDetections(
+            packageTree,
+            new Map<string, PackageTree<PointOfInterest[]>>())} Transitive`);
 
     if (packageTree.data.length > 0) {
       arrOfStrings.push(`  Detected Patterns:`);
@@ -56,6 +60,17 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
 
     packageTree.data.forEach((data) => {
       arrOfStrings.push(`     Type: ${data.type}`);
+    });
+
+    if (packageTree.dependencies.length > 0) {
+      arrOfStrings.push(`  Dependencies:`);
+    }
+
+    packageTree.dependencies.forEach((dep) => {
+      if (dep.data.length > 0) {
+        arrOfStrings.push(
+            `     ${dep.name} ${dep.version} Detections: ${dep.data.length} `);
+      }
     });
   });
 
