@@ -14,18 +14,24 @@
  * limitations under the License.
  */
 
+import * as path from 'path';
 import semver from 'semver';
 
 import {getNumberOfTransitiveDetections, squashDetections} from './output-util';
 import {PackageTree, PointOfInterest} from './package-tree';
 
 // File to output to user
-export function outputToUser(packageTree: PackageTree<PointOfInterest[]>) {
+export function outputToUser(
+    packageTree: PackageTree<PointOfInterest[]>, verbose = false) {
   const sortedModules =
       flattenPackageTree(
           packageTree, new Map<string, PackageTree<PointOfInterest[]>>())
           .sort(compare);
-  console.log(output(sortedModules));
+  if (verbose) {
+    console.log(verboseOutput(sortedModules));
+  } else {
+    console.log(output(sortedModules));
+  }
 }
 
 function flattenPackageTree(
@@ -66,13 +72,50 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
       }
     }
 
-
-    if (packageTree.dependencies.length > 0) {
-      arrOfStrings.push(`  Dependencies:`);
-    }
+    let dependencyFound = false;
 
     packageTree.dependencies.forEach((dep) => {
       if (dep.data.length > 0) {
+        if (!dependencyFound) {
+          arrOfStrings.push(`  Dependencies:`);
+          dependencyFound = true;
+        }
+        arrOfStrings.push(
+            `     ${dep.name} ${dep.version} Detections: ${dep.data.length}`);
+      }
+    });
+  });
+
+  return arrOfStrings.join('\n');
+}
+
+function verboseOutput(packageTrees: Array<PackageTree<PointOfInterest[]>>):
+    string {
+  const arrOfStrings: string[] = [];
+  packageTrees.forEach((packageTree) => {
+    arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
+        packageTree.data.length} Immediate ${
+        getNumberOfTransitiveDetections(
+            packageTree,
+            new Map<string, PackageTree<PointOfInterest[]>>())} Transitive`);
+
+    if (packageTree.data.length > 0) {
+      arrOfStrings.push(`  Detected Patterns:`);
+    }
+    packageTree.data.forEach((dataPoint) => {
+      arrOfStrings.push(`     ${dataPoint.type} found in ${
+          dataPoint.fileName.split('node_modules/')[1]} at ${
+          JSON.stringify(dataPoint.position, null, 1)}`);
+    });
+
+    let dependencyFound = false;
+
+    packageTree.dependencies.forEach((dep) => {
+      if (dep.data.length > 0) {
+        if (!dependencyFound) {
+          arrOfStrings.push(`  Dependencies:`);
+          dependencyFound = true;
+        }
         arrOfStrings.push(
             `     ${dep.name} ${dep.version} Detections: ${dep.data.length}`);
       }

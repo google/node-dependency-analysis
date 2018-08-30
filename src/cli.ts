@@ -27,8 +27,9 @@ const cli = meow({
  
     Options
       --help        Prints this help message.
+      --verbose, -v   Prints a more detailed output
   `,
-  flags: {help: {type: 'boolean'}}
+  flags: {help: {type: 'boolean'}, verbose: {type: 'boolean', alias: 'v'}}
 });
 
 if (cli.input.length !== 1) {
@@ -36,7 +37,7 @@ if (cli.input.length !== 1) {
   cli.showHelp(1);
   process.exit(1);
 } else {
-  run(cli.input[0]);
+  run(cli.input[0], cli.flags);
 }
 
 async function validNodePackage(path: string) {
@@ -59,7 +60,8 @@ async function validNodePackage(path: string) {
   return true;
 }
 
-async function run(packageRootDir: string) {
+async function run(
+    packageRootDir: string, flags: {[flagName: string]: boolean}) {
   // Step 1: Takes in the root of the package
   if (!(await validNodePackage(packageRootDir))) {
     process.exit(1);
@@ -73,6 +75,5 @@ async function run(packageRootDir: string) {
       await tree.populatePOIInPackageTree(packageTreeWithPath);
 
   // Step 4: output
-  // TODO: Uncomment this line.
-  outputToUser(packageTreeWithPOI);
+  outputToUser(packageTreeWithPOI, flags.verbose);
 }
