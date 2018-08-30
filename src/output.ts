@@ -101,6 +101,14 @@ function verboseOutput(packageTrees: Array<PackageTree<PointOfInterest[]>>):
 
     if (packageTree.data.length > 0) {
       arrOfStrings.push(`  Detected Patterns:`);
+      const squashedDetections = squashDetections(packageTree);
+      for (const type of squashedDetections) {
+        if (type[1] > 1) {
+          arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
+        } else {
+          arrOfStrings.push(`     ${type[0]}`);
+        }
+      }
     }
     packageTree.data.forEach((dataPoint) => {
       arrOfStrings.push(`     ${dataPoint.type} found in ${

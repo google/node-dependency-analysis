@@ -20,8 +20,6 @@ import {Node} from 'estree';
 import * as analysisUtil from './analysis-util';
 import {PointOfInterest, Position} from './package-tree';
 
-const walk = require('acorn/dist/walk');
-
 enum IdType {
   CALLEE,
   OBJECT
@@ -31,14 +29,13 @@ enum IdType {
  * Gets a list of PointOfInterest objects, indicating that there were IO
  * modules that were required in a file
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
-export function getIOModules(
-    contents: string, file: string): PointOfInterest[] {
+export function getIOModules(acornTree: Node, file: string): PointOfInterest[] {
   const ioModuleList: string[] =
       ['http', 'fs', 'https', 'http2', 'net', 'datagram'];
-  const found = analysisUtil.findModules(contents, file, ioModuleList);
+  const found = analysisUtil.findModules(acornTree, file, ioModuleList);
   return found;
 }
 
@@ -46,15 +43,15 @@ export function getIOModules(
  * Gets a list of PointOfInterest objects, indicating that there were
  * required modules that can execute arbitrary code
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
 export function getArbitraryExecutionMods(
-    contents: string, file: string): PointOfInterest[] {
+    acornTree: Node, file: string): PointOfInterest[] {
   const arbitraryExecutionMods: string[] =
       ['child_process', 'repl', 'vm', 'module'];
   const found =
-      analysisUtil.findModules(contents, file, arbitraryExecutionMods);
+      analysisUtil.findModules(acornTree, file, arbitraryExecutionMods);
 
   return found;
 }
@@ -63,14 +60,11 @@ export function getArbitraryExecutionMods(
  * Gets a list of PointOfInterest objects, indicating that dynamic
  * evaluation was used in the file
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
 export function getDynamicRequires(
-    contents: string, file: string): PointOfInterest[] {
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
-
+    acornTree: Node, file: string): PointOfInterest[] {
   const requireAliasPOIs: PointOfInterest[] = [];
 
   const requireAliasCalls: Position[] =
@@ -91,7 +85,7 @@ export function getDynamicRequires(
 /**
  * Creates a Point of Interest object if there are syntax error(s) in a file
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
 export function getSyntaxError(contents: string, file: string): PointOfInterest|
@@ -109,15 +103,12 @@ export function getSyntaxError(contents: string, file: string): PointOfInterest|
 /**
  * Gets a list of PointOfInterest objects that indicate usages of eval
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
-export function getEvalCalls(
-    contents: string, file: string): PointOfInterest[] {
+export function getEvalCalls(acornTree: Node, file: string): PointOfInterest[] {
   const evalPOIs: PointOfInterest[] = [];
 
-  const acornTree =
-      acorn.parse(contents, {allowHashBang: true, locations: true});
   const foundStandardEvalCalls: Node[] =
       analysisUtil.findCallee('eval', acornTree);
   foundStandardEvalCalls.forEach((node) => {
@@ -139,12 +130,14 @@ export function getEvalCalls(
  * Returns Points Of Interest that indicate uses of process.env and
  * dynamic calls to process and the properties in process
  *
- * @param contents the contents of the file
+ * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
 export function getEnvAccesses(
-    contents: string, file: string): PointOfInterest[] {
+    acornTree: Node, file: string): PointOfInterest[] {
   const envAccesses: PointOfInterest[] =
-      analysisUtil.getAccesses('process', 'env', contents, file);
-  return envAccesses;
+      analysisUtil.getAccesses('process', 'env', acornTree, file);
+  const obscuredProcessAccesses: PointOfInterest[] =
+      analysisUtil.getDynamicAccesses('process', acornTree, file);
+  return [...envAccesses, ...obscuredProcessAccesses];
 }
