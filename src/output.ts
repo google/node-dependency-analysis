@@ -27,11 +27,8 @@ export function outputToUser(
       flattenPackageTree(
           packageTree, new Map<string, PackageTree<PointOfInterest[]>>())
           .sort(compare);
-  if (verbose) {
-    console.log(verboseOutput(sortedModules));
-  } else {
-    console.log(output(sortedModules));
-  }
+
+  console.log(output(sortedModules, verbose));
 }
 
 function flattenPackageTree(
@@ -51,68 +48,33 @@ function flattenPackageTree(
   return combined;
 }
 
-function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
+function output(
+    packageTrees: Array<PackageTree<PointOfInterest[]>>,
+    verbose: boolean): string {
   const arrOfStrings: string[] = [];
   packageTrees.forEach((packageTree) => {
     arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
         packageTree.data.length} Immediate ${
         getNumberOfTransitiveDetections(packageTree)} Transitive`);
-
-    if (packageTree.data.length > 0) {
-      arrOfStrings.push(`  Detected Patterns:`);
-      const squashedDetections = squashDetections(packageTree);
-      for (const type of squashedDetections) {
-        if (type[1] > 1) {
-          arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
-        } else {
-          arrOfStrings.push(`     ${type[0]}`);
+    if (verbose) {
+      packageTree.data.forEach((dataPoint) => {
+        arrOfStrings.push(`     ${dataPoint.type} found in ${
+            dataPoint.fileName.split('node_modules/')[1]} at ${
+            JSON.stringify(dataPoint.position, null, 1)}`);
+      });
+    } else {
+      if (packageTree.data.length > 0) {
+        arrOfStrings.push(`  Detected Patterns:`);
+        const squashedDetections = squashDetections(packageTree);
+        for (const type of squashedDetections) {
+          if (type[1] > 1) {
+            arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
+          } else {
+            arrOfStrings.push(`     ${type[0]}`);
+          }
         }
       }
     }
-
-    let dependencyFound = false;
-
-    packageTree.dependencies.forEach((dep) => {
-      if (dep.data.length > 0) {
-        if (!dependencyFound) {
-          arrOfStrings.push(`  Dependencies:`);
-          dependencyFound = true;
-        }
-        arrOfStrings.push(
-            `     ${dep.name} ${dep.version} Detections: ${dep.data.length}`);
-      }
-    });
-  });
-
-  return arrOfStrings.join('\n');
-}
-
-function verboseOutput(packageTrees: Array<PackageTree<PointOfInterest[]>>):
-    string {
-  const arrOfStrings: string[] = [];
-  packageTrees.forEach((packageTree) => {
-    arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
-        packageTree.data.length} Immediate ${
-        getNumberOfTransitiveDetections(
-            packageTree,
-            )} Transitive`);
-
-    if (packageTree.data.length > 0) {
-      arrOfStrings.push(`  Detected Patterns:`);
-      const squashedDetections = squashDetections(packageTree);
-      for (const type of squashedDetections) {
-        if (type[1] > 1) {
-          arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
-        } else {
-          arrOfStrings.push(`     ${type[0]}`);
-        }
-      }
-    }
-    packageTree.data.forEach((dataPoint) => {
-      arrOfStrings.push(`     ${dataPoint.type} found in ${
-          dataPoint.fileName.split('node_modules/')[1]} at ${
-          JSON.stringify(dataPoint.position, null, 1)}`);
-    });
 
     let dependencyFound = false;
 
