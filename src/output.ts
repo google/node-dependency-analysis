@@ -56,9 +56,7 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
   packageTrees.forEach((packageTree) => {
     arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
         packageTree.data.length} Immediate ${
-        getNumberOfTransitiveDetections(
-            packageTree,
-            new Map<string, PackageTree<PointOfInterest[]>>())} Transitive`);
+        getNumberOfTransitiveDetections(packageTree)} Transitive`);
 
     if (packageTree.data.length > 0) {
       arrOfStrings.push(`  Detected Patterns:`);
@@ -97,7 +95,7 @@ function verboseOutput(packageTrees: Array<PackageTree<PointOfInterest[]>>):
         packageTree.data.length} Immediate ${
         getNumberOfTransitiveDetections(
             packageTree,
-            new Map<string, PackageTree<PointOfInterest[]>>())} Transitive`);
+            )} Transitive`);
 
     if (packageTree.data.length > 0) {
       arrOfStrings.push(`  Detected Patterns:`);

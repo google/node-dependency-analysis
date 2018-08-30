@@ -1,17 +1,30 @@
 import {PackageTree, PointOfInterest} from './package-tree';
 
 export function getNumberOfTransitiveDetections(
-    packageTree: PackageTree<PointOfInterest[]>,
-    totalDetections: Map<string, PackageTree<PointOfInterest[]>>): number {
-  let totalDependencies = packageTree.data.length;
+    packageTree: PackageTree<PointOfInterest[]>): number {
+  let totalDetections = packageTree.data.length;
+  const countedDependencies = new Map<string, PackageTree<PointOfInterest[]>>();
   packageTree.dependencies.forEach((dep) => {
-    if (!totalDetections.has(`${dep.name} ${dep.version}`)) {
-      totalDetections.set(`${dep.name} ${dep.version}`, dep);
-      totalDependencies +=
-          getNumberOfTransitiveDetections(dep, totalDetections);
-    }
+    totalDetections +=
+        getNumberOfTransitiveDetectionsRec(dep, countedDependencies);
   });
-  return totalDependencies;
+  return totalDetections;
+
+
+  function getNumberOfTransitiveDetectionsRec(
+      packageTree: PackageTree<PointOfInterest[]>,
+      countedDependencies: Map<string, PackageTree<PointOfInterest[]>>):
+      number {
+    let totalDetections = packageTree.data.length;
+    packageTree.dependencies.forEach((dep) => {
+      if (!countedDependencies.has(`${dep.name} ${dep.version}`)) {
+        countedDependencies.set(`${dep.name} ${dep.version}`, dep);
+        totalDetections +=
+            getNumberOfTransitiveDetectionsRec(dep, countedDependencies);
+      }
+    });
+    return totalDetections;
+  }
 }
 
 export function squashDetections(packageTree: PackageTree<PointOfInterest[]>):
