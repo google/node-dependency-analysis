@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import * as acorn from 'acorn';
 import * as fs from 'fs';
 import * as path from 'path';
 import pify from 'pify';
@@ -69,7 +70,6 @@ export interface Dependency {
   requires?: {[moduleName: string]: string};
   dependencies?: {[moduleName: string]: Dependency};
 }
-
 
 /**
  * Replaces the data of each node in the packageTree with the Points Of
@@ -243,8 +243,10 @@ function getPointsOfInterest(
 
   // If there are no syntax errors, then use the other detection functions
   if (!syntaxError) {
+    const acornTree =
+        acorn.parse(contents, {allowHashBang: true, locations: true});
     functionArray.forEach((f) => {
-      const subList = f(contents, fileName);
+      const subList = f(acornTree, fileName);
       pointsOfInterest.push(...subList);
     });
   } else {

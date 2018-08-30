@@ -71,6 +71,7 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
       arrOfStrings.push(`  Dependencies:`);
     }
 
+
     packageTree.dependencies.forEach((dep) => {
       if (dep.data.length > 0) {
         arrOfStrings.push(
