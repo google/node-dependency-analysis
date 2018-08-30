@@ -16,7 +16,7 @@
 
 import semver from 'semver';
 
-import {getNumberOfTransitiveDetections} from './output-util';
+import {getNumberOfTransitiveDetections, squashDetections} from './output-util';
 import {PackageTree, PointOfInterest} from './package-tree';
 
 // File to output to user
@@ -56,11 +56,16 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
 
     if (packageTree.data.length > 0) {
       arrOfStrings.push(`  Detected Patterns:`);
+      const squashedDetections = squashDetections(packageTree);
+      for (const type of squashedDetections) {
+        if (type[1] > 1) {
+          arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
+        } else {
+          arrOfStrings.push(`     ${type[0]}`);
+        }
+      }
     }
 
-    packageTree.data.forEach((data) => {
-      arrOfStrings.push(`     Type: ${data.type}`);
-    });
 
     if (packageTree.dependencies.length > 0) {
       arrOfStrings.push(`  Dependencies:`);
@@ -69,7 +74,7 @@ function output(packageTrees: Array<PackageTree<PointOfInterest[]>>): string {
     packageTree.dependencies.forEach((dep) => {
       if (dep.data.length > 0) {
         arrOfStrings.push(
-            `     ${dep.name} ${dep.version} Detections: ${dep.data.length} `);
+            `     ${dep.name} ${dep.version} Detections: ${dep.data.length}`);
       }
     });
   });
