@@ -2,13 +2,13 @@ import {PackageTree, PointOfInterest} from './package-tree';
 
 export function getNumberOfTransitiveDetections(
     packageTree: PackageTree<PointOfInterest[]>,
-    countedDependencies: Map<string, PackageTree<PointOfInterest[]>>): number {
+    totalDetections: Map<string, PackageTree<PointOfInterest[]>>): number {
   let totalDependencies = packageTree.data.length;
   packageTree.dependencies.forEach((dep) => {
-    if (!countedDependencies.has(`${dep.name} ${dep.version}`)) {
-      countedDependencies.set(`${dep.name} ${dep.version}`, dep);
+    if (!totalDetections.has(`${dep.name} ${dep.version}`)) {
+      totalDetections.set(`${dep.name} ${dep.version}`, dep);
       totalDependencies +=
-          getNumberOfTransitiveDetections(dep, countedDependencies);
+          getNumberOfTransitiveDetections(dep, totalDetections);
     }
   });
   return totalDependencies;
@@ -16,7 +16,7 @@ export function getNumberOfTransitiveDetections(
 
 export function squashDetections(packageTree: PackageTree<PointOfInterest[]>):
     Map<string, number> {
-  const sortedDataArray = packageTree.data.sort(compare);
+  const sortedDataArray = packageTree.data.slice(0).sort(compare);
   const squashedDetections: Map<string, number> = new Map();
   for (const point of sortedDataArray) {
     if (squashedDetections.has(point.type)) {
