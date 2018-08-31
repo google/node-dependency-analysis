@@ -70,7 +70,7 @@ export function findObject(name: string, tree: Node): MemberExpression[] {
  *
  * @param object the name of the object
  * @param property the name of the property
- * @param contents the contents of the file
+ * @param acornTree abstract syntax tree
  * @param file the file being checked
  */
 export function getAccesses(
@@ -92,7 +92,7 @@ export function getAccesses(
  * and its properties
  *
  * @param object the name of the object
- * @param contents the contents of the file
+ * @param acornTree abstract syntax tree
  * @param file the file being checked
  */
 export function getDynamicAccesses(
@@ -105,11 +105,10 @@ export function getDynamicAccesses(
     dynamicAccesses.push(createPOI(`Obscured ${object} property`, file, pos));
   });
 
-  const obscuredObjects: Position[] =
-      locateAliases(acornTree, object, IdType.OBJECT);
-  obscuredObjects.forEach((pos) => {
-    dynamicAccesses.push(createPOI(`Obscured ${object} object`, file, pos));
-  });
+  const obscuredObjects: PointOfInterest[] =
+      locateAliases(acornTree, file, object);
+  dynamicAccesses.push(...obscuredObjects);
+
   return dynamicAccesses;
 }
 
@@ -241,7 +240,7 @@ export function getArgument(node: Node): string|null {
 /**
  * Finds and creates POI for modules in the list that are required in the file
  *
- * @param contents the contents of the file
+ * @param acornTree abstract syntax tree
  * @param file the file being checked
  * @param moduleList the array of modules that are being searched for
  */
@@ -258,13 +257,12 @@ export function findModules(
  * Given a specific identifier, this method returns a list of positions where
  * the identifier is found under aliases
  *
- * @param id the identifier being searched for
  * @param tree abstract syntax tree
- * @param file the name of the file being checked
+ * @param id the identifier being searched for
  */
 export function locateAliases(
-    tree: Node, id: string, type: IdType): Position[] {
-  const positions: Position[] = [];
+    tree: Node, file: string, id: string): PointOfInterest[] {
+  const pois: PointOfInterest[] = [];
   walk.fullAncestor(tree, (n: Node, ancestors: Node[]) => {
     if (n && n.type === 'Identifier') {
       if (n.name === id) {
@@ -272,20 +270,60 @@ export function locateAliases(
         // parent
         const parent: Node = ancestors[ancestors.length - 2];
 
-        // If node has name of id, and isn't a callee of a Call Expression
-        if (type === IdType.CALLEE &&
-                (parent.type !== 'CallExpression' || parent.callee !== n)
-            // If node has name of id and isn't an object of a Member Expression
-            || type === IdType.OBJECT &&
-                (parent.type !== 'MemberExpression' || parent.object !== n)) {
-          // Get the second element of ancestors array b/c 1st is the program
-          const pos: Position = getPosition(ancestors[1]);
-          positions.push(pos);
+        // Assignment to variable
+        if ((parent.type === 'VariableDeclarator') ||
+            (parent.type === 'AssignmentExpression') ||
+
+            // Potential assignment to variable
+            (parent.type === 'LogicalExpression') ||
+            (parent.type === 'ConditionalExpression') ||
+            (parent.type === 'BinaryExpression' && parent.operator === '+') ||
+
+            // Argument of a call expression
+            (parent.type === 'CallExpression' &&
+             parent.arguments.some((arg) => {
+               return arg.type === 'Identifier' && arg.name === id;
+             })) ||
+
+            // return statement
+            (parent.type === 'ReturnStatement' && parent.argument &&
+             parent.argument.type === 'Identifier' &&
+             parent.argument.name === id)) {
+          const pos: Position = getPosition(parent);
+          pois.push(createPOI(`Obfuscated ${id} identifier`, file, pos));
         }
       }
     }
   });
-  return positions;
+  return pois;
+}
+
+/**
+ * Given a specific identifier, this method returns a list of positions where
+ * the identifier is found under aliases
+ *
+ * @param acornTree
+ * @param id
+ */
+export function locatePropAccessesOfFuncs(
+    acornTree: Node, file: string, id: string) {
+  const pois: PointOfInterest[] = [];
+  walk.fullAncestor(acornTree, (n: Node, ancestors: Node[]) => {
+    if (n && n.type === 'Identifier') {
+      if (n.name === id) {
+        // last element is current node and second to last it the node's
+        // parent
+        const parent: Node = ancestors[ancestors.length - 2];
+
+        // Assignment to variable
+        if (parent.type === 'MemberExpression' && parent.object === n) {
+          const pos: Position = getPosition(parent);
+          pois.push(createPOI(`Access to a property of ${id}`, file, pos));
+        }
+      }
+    }
+  });
+  return pois;
 }
 
 /**

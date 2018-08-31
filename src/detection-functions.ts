@@ -18,12 +18,7 @@ import * as acorn from 'acorn';
 import {Node} from 'estree';
 
 import * as analysisUtil from './analysis-util';
-import {PointOfInterest, Position} from './package-tree';
-
-enum IdType {
-  CALLEE,
-  OBJECT
-}
+import {PointOfInterest} from './package-tree';
 
 /**
  * Gets a list of PointOfInterest objects, indicating that there were IO
@@ -57,29 +52,25 @@ export function getArbitraryExecutionMods(
 }
 
 /**
- * Gets a list of PointOfInterest objects, indicating that dynamic
- * evaluation was used in the file
+ * Gets a list of PointOfInterest objects indicating unconventional
+ * uses of require in a file
  *
  * @param acornTree the AST of the file
  * @param file the name of the file being checked
  */
-export function getDynamicRequires(
+export function unusualUsesOfRequire(
     acornTree: Node, file: string): PointOfInterest[] {
-  const requireAliasPOIs: PointOfInterest[] = [];
-
-  const requireAliasCalls: Position[] =
-      analysisUtil.locateAliases(acornTree, 'require', IdType.CALLEE);
-  requireAliasCalls.forEach((pos) => {
-    const requireAliasPOI =
-        analysisUtil.createPOI('Dynamic Require Call', file, pos);
-    requireAliasPOIs.push(requireAliasPOI);
-  });
+  const requireAliasPOIs: PointOfInterest[] =
+      analysisUtil.locateAliases(acornTree, file, 'require');
 
   const requireCalls = analysisUtil.findCallee('require', acornTree);
   const dynamicRequireArgs: PointOfInterest[] =
       analysisUtil.getRequiredModules(requireCalls, file, true);
 
-  return [...requireAliasPOIs, ...dynamicRequireArgs];
+  const accessedRequireProps: PointOfInterest[] =
+      analysisUtil.locatePropAccessesOfFuncs(acornTree, file, 'require');
+
+  return [...requireAliasPOIs, ...dynamicRequireArgs, ...accessedRequireProps];
 }
 
 /**
@@ -108,7 +99,6 @@ export function getSyntaxError(contents: string, file: string): PointOfInterest|
  */
 export function getEvalCalls(acornTree: Node, file: string): PointOfInterest[] {
   const evalPOIs: PointOfInterest[] = [];
-
   const foundStandardEvalCalls: Node[] =
       analysisUtil.findCallee('eval', acornTree);
   foundStandardEvalCalls.forEach((node) => {
@@ -117,13 +107,13 @@ export function getEvalCalls(acornTree: Node, file: string): PointOfInterest[] {
     evalPOIs.push(evalPOI);
   });
 
-  const positionsOfAliases: Position[] =
-      analysisUtil.locateAliases(acornTree, 'eval', IdType.CALLEE);
-  positionsOfAliases.forEach((pos) => {
-    const evalPOI = analysisUtil.createPOI('Eval Call', file, pos);
-    evalPOIs.push(evalPOI);
-  });
-  return evalPOIs;
+  const evalAliases: PointOfInterest[] =
+      analysisUtil.locateAliases(acornTree, file, 'eval');
+
+  const evalPropAccesses: PointOfInterest[] =
+      analysisUtil.locatePropAccessesOfFuncs(acornTree, file, 'eval');
+
+  return [...evalPOIs, ...evalAliases, ...evalPropAccesses];
 }
 
 /**

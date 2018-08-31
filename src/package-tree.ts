@@ -116,7 +116,7 @@ export async function getPackagePOIList(path: string):
     const content = await util.readFile(file, 'utf8');
     const functionArr: Function[] = [
       analysis.getIOModules, analysis.getArbitraryExecutionMods,
-      analysis.getDynamicRequires, analysis.getEvalCalls,
+      analysis.unusualUsesOfRequire, analysis.getEvalCalls,
       analysis.getEnvAccesses
 
     ];

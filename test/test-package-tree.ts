@@ -130,7 +130,7 @@ test(
       const updatedA1Node = await tree.populatePOIInPackageTree(n);
       t.deepEqual(updatedA1Node.data.length, 2);
       t.true(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'Dynamic Require Call' &&
+        return pkg.type === 'Obfuscated require identifier' &&
             pkg.fileName === path.join(p, 'file1.js');
       }));
       t.true(updatedA1Node.data.some((pkg) => {
@@ -157,7 +157,7 @@ test(
             pkg.fileName === path.join(a1Path, 'file1.js');
       }));
       t.false(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'Dynamic Require Call' &&
+        return pkg.type === 'Obfuscated require identifier' &&
             pkg.fileName === path.join(a1Path, 'file1.js');
       }));
       t.true(updatedA1Node.data.some((pkg) => {

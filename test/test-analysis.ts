@@ -66,6 +66,12 @@ test(
       const result2 = analysis.getIOModules(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'http');
+
+      const content3 = 'a = require(\'http\');';
+      const acornTree3 = parse(content3);
+      const result3 = analysis.getIOModules(acornTree3, 'file');
+      t.deepEqual(result3.length, 1);
+      t.deepEqual(result3[0].type, 'http');
     });
 
 test('getIOModules should detect both http and fs module', async t => {
@@ -107,80 +113,114 @@ test(
     });
 
 test(
-    'getDynamicEval should detect concatenation of strings that forms http ' +
-        'as a dyanmic require arg',
+    'unusualUsesOfRequire should detect concatenation of strings that forms http ' +
+        'as a dynamic require arg',
     async t => {
       const content = 'const a = require(\'h\' + \'t\' + \'t\' + \'p\');';
       const acornTree = parse(content);
-      const result = analysis.getDynamicRequires(acornTree, 'file');
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
 
 test(
-    'getDynamicEval should detect substring that forms http as a dynamic ' +
-        'require arg',
+    'unusualUsesOfRequire should detect substring that forms http as a' +
+        'dynamic require arg',
     async t => {
       const content1 =
           `const a = \'anotherhttp\'\nconst b = require(a.substring(6));`;
       const acornTree1 = parse(content1);
-      const result1 = analysis.getDynamicRequires(acornTree1, 'file');
+      const result1 = analysis.unusualUsesOfRequire(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
       t.deepEqual(result1[0].type, 'Dynamic Require Arg');
 
       const content2 = 'const a = require(\'anotherhttp\'.substring(6))';
       const acornTree2 = parse(content2);
-      const result2 = analysis.getDynamicRequires(acornTree2, 'file');
+      const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
       t.deepEqual(result2[0].type, 'Dynamic Require Arg');
     });
 
 test(
-    'getDynamicEval should detect function that returns http as a ' +
+    'unusualUsesOfRequire should detect function that returns http as a ' +
         'dynamic require arg',
     async t => {
       const content =
           'function returnHttp(){return \'http\';}\nconst a = require(returnHttp);';
       const acornTree = parse(content);
-      const result = analysis.getDynamicRequires(acornTree, 'file');
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
       t.deepEqual(result[0].type, 'Dynamic Require Arg');
     });
 
 test(
-    'getDynamicEval should detect if require callee is defined as a variable',
+    'unusualUsesOfRequire should detect if require callee is defined' +
+        'as a variable',
     async t => {
-      const content = `function something(){ return 1;}
-                        const a = require; 
+      const content = `const a = require; 
                         const b = a(\'https\');`;
       const acornTree = parse(content);
-      const result = analysis.getDynamicRequires(acornTree, 'file');
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Dynamic Require Call');
+      t.deepEqual(result[0].type, 'Obfuscated require identifier');
+
+      const content2 = 'a = require;';
+      const acornTree2 = parse(content2);
+      const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'Obfuscated require identifier');
     });
 
 test(
-    'getDynamicEval should detect if require identifier is ' +
+    'unusualUsesOfRequire should detect if require identifier is ' +
         'returned in a function',
     async t => {
-      const content =
-          'function returnRequire(){return require;}\n const a = returnRequire();\nconst b = a(\'http\');';
+      const content = 'function returnRequire(){return require;}\n ' +
+          'const a = returnRequire();\nconst b = a(\'http\');';
       const acornTree = parse(content);
-      const result = analysis.getDynamicRequires(acornTree, 'file');
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Dynamic Require Call');
+      t.deepEqual(result[0].type, 'Obfuscated require identifier');
     });
 
 test(
-    'getDynamicEval should detect if require identifier is passed as a ' +
-        'parameter in a function',
+    'unusualUsesOfRequire should detect if require identifier is ' +
+        'passed as a parameter in a function',
     async t => {
       const content =
           'function f(a, b){return a(b)}\nconst a = f(require, \'http\');';
       const acornTree = parse(content);
-      const result = analysis.getDynamicRequires(acornTree, 'file');
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Dynamic Require Call');
+      t.deepEqual(result[0].type, 'Obfuscated require identifier');
+    });
+
+
+test(
+    'unusualUsesOfRequire should not return a POI when' +
+        'the require object and property is being used',
+    async t => {
+      const content = 'const a = global.require;';
+      const acornTree = parse(content);
+      const result = analysis.unusualUsesOfRequire(acornTree, 'file');
+      t.deepEqual(result.length, 0);
+    });
+
+test(
+    'unusualUsesOfRequire should detect cases where require is ' +
+        'assigned to a variable',
+    async t => {
+      const content1 = 'const r = require || 0;';
+      const acornTree1 = parse(content1);
+      const result1 = analysis.unusualUsesOfRequire(acornTree1, 'file');
+      t.deepEqual(result1.length, 1);
+      t.deepEqual(result1[0].type, 'Obfuscated require identifier');
+
+      const content2 = 'r = require + 0;';
+      const acornTree2 = parse(content2);
+      const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'Obfuscated require identifier');
     });
 
 test(
@@ -217,7 +257,7 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getEvalCalls(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Eval Call');
+      t.deepEqual(result1[0].type, 'Obfuscated eval identifier');
 
       const content2 =
           'doSomethingBad(eval); function doSomethingBad(something)' +
@@ -225,7 +265,17 @@ test(
       const acornTree2 = parse(content2);
       const result2 = analysis.getEvalCalls(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Eval Call');
+      t.deepEqual(result2[0].type, 'Obfuscated eval identifier');
+    });
+
+test(
+    'getEvalCalls should return a POIs when eval\'s properties are accessed',
+    async t => {
+      const content = 'const e = eval.call(null, \'doSomethingBad\')';
+      const acornTree = parse(content);
+      const result = analysis.getEvalCalls(acornTree, 'file');
+      t.deepEqual(result.length, 1);
+      t.deepEqual(result[0].type, 'Access to a property of eval');
     });
 
 test(
@@ -280,7 +330,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getEnvAccesses(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obscured process object');
+      t.deepEqual(result[0].type, 'Obfuscated process identifier');
     });
 
 test(
