@@ -190,13 +190,13 @@ export async function resolvePaths(
  */
 export async function findPath(
     mod: string, parentPath: string): Promise<string> {
-  const moduleFolder = path.join(parentPath, 'node_modules');
+  const moduleFolder = path.join(parentPath, 'node_modules', mod);
+
+  // Checks to see if parentPath/node_modules/moduleName exists. If not call
+  // findPath on the directory above
   if ((await util.exists(moduleFolder)) &&
       (await util.stat(moduleFolder)).isDirectory()) {
-    const filesInFolder = await util.readdir(moduleFolder);
-    if (filesInFolder.includes(mod)) {
-      return path.join(moduleFolder, mod);
-    }
+    return moduleFolder;
   }
   let currPath = path.dirname(parentPath);
   while (!(await util.readdir(currPath)).includes('package.json')) {
