@@ -75,17 +75,19 @@ function output(
         }
       }
     }
-
+    // only display modules that have immediate or transitive dependencies in
+    // dependencies field to save space
     let dependencyFound = false;
 
     packageTree.dependencies.forEach((dep) => {
-      if (dep.data.length > 0) {
+      if (dep.data.length > 0 || getNumberOfTransitiveDetections(dep) > 0) {
         if (!dependencyFound) {
           arrOfStrings.push(`  Dependencies:`);
           dependencyFound = true;
         }
-        arrOfStrings.push(
-            `     ${dep.name} ${dep.version} Detections: ${dep.data.length}`);
+        arrOfStrings.push(`     ${dep.name} ${dep.version} Detections: ${
+            dep.data.length} Immediate ${
+            getNumberOfTransitiveDetections(dep)} Transitive`);
       }
     });
   });
