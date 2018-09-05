@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import chalk from 'chalk';
 import * as path from 'path';
 import semver from 'semver';
 
@@ -58,9 +59,11 @@ function output(
         getNumberOfTransitiveDetections(packageTree)} Transitive`);
     if (verbose) {
       packageTree.data.forEach((dataPoint) => {
-        arrOfStrings.push(`     ${dataPoint.type} found in ${
-            dataPoint.fileName.split('node_modules/')[1]} at ${
-            JSON.stringify(dataPoint.position, null, 1)}`);
+        arrOfStrings.push(getColorFromType(
+            dataPoint.type,
+            `     ${dataPoint.type} found in ${
+                dataPoint.fileName.split('node_modules/')[1]} at ${
+                JSON.stringify(dataPoint.position, null, 1)}`));
       });
     } else {
       if (packageTree.data.length > 0) {
@@ -68,9 +71,10 @@ function output(
         const squashedDetections = squashDetections(packageTree);
         for (const type of squashedDetections) {
           if (type[1] > 1) {
-            arrOfStrings.push(`     ${type[1]} instances of '${type[0]}'`);
+            arrOfStrings.push(getColorFromType(
+                type[0], `     ${type[1]} instances of '${type[0]}'`));
           } else {
-            arrOfStrings.push(`     ${type[0]}`);
+            arrOfStrings.push(getColorFromType(type[0], `     ${type[0]}`));
           }
         }
       }
@@ -116,3 +120,43 @@ function compare(
     return a.version.localeCompare(b.version);
   }
 }
+
+function getColorFromType(type: string, detectionString: string): string {
+  const severity = typeTable[type];
+  switch (severity) {
+    case 1:
+      return chalk.greenBright(detectionString);
+    case 2:
+      return chalk.yellowBright(detectionString);
+    case 3:
+      return chalk.redBright(detectionString);
+    default:
+      return detectionString;
+  }
+}
+
+// Maps each type to a severity value which is translated to a color for the
+// output in getColorFromType
+const typeTable: {[type: string]: number} = {
+  'http': 2,
+  'http2': 2,
+  'fs': 2,
+  'https': 2,
+  'net': 2,
+  'datagram': 2,
+  'child_process': 2,
+  'repl': 3,
+  'vm': 3,
+  'module': 3,
+  'Syntax Error': 1,
+  'Dynamic Require Arg': 3,
+  'Obfuscated require identifier': 3,
+  'Eval Call': 3,
+  'Obfuscated eval identifier': 3,
+  'Access to a property of eval': 3,
+  'Access to process.env': 2,
+  'Obscured process property': 3,
+  'Obfuscated process identifier': 3,
+  'Obscured process object': 3,
+  'Dynamic Require Call': 3
+};
