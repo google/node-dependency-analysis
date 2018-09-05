@@ -157,3 +157,23 @@ export function getFunctionClassAccesses(acornTree: Node, file: string) {
 
   return [...functionClassPOIs, ...functionAliases, ...functionPropAccesses];
 }
+
+/**
+ * Returns Points Of Interest that indicate uses of specific global properties
+ *
+ * @param acornTree the AST of the file
+ * @param file the name of the file being checked
+ */
+export function getAccessesToGlobalProps(acornTree: Node, file: string) {
+  const accessesToGlobalProps: PointOfInterest[] = [];
+  const bannedProps = ['Function', 'require', 'eval'];
+  bannedProps.forEach((prop) => {
+    const accessToGlobalProp =
+        analysisUtil.getAccesses('global', prop, acornTree, file);
+
+    accessesToGlobalProps.push(...accessToGlobalProp);
+  });
+  const obfuscatedGlobal =
+      analysisUtil.getDynamicAccesses('global', acornTree, file);
+  return [...accessesToGlobalProps, ...obfuscatedGlobal];
+}

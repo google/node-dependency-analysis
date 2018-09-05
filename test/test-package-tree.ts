@@ -123,7 +123,7 @@ test(
     'the package tree should be populated with Points of Interest', async t => {
       const test = new util.TestProject(testCases.project5);
       test.addFile('a@1', './file1.js', 'const r = require;\n');
-      test.addFile('a@1', './file2.js', 'const h = require(\'http\');');
+      test.addFile('a@1', './file2.js', 'const h = require("http");');
       const testPath: string = await test.create();
       const p = path.join(testPath, 'a@1');
       const n = {name: 'a', version: '1.0.0', data: p, dependencies: []};
@@ -144,8 +144,8 @@ test(
         'file if there is a syntax error',
     async t => {
       const test = new util.TestProject(testCases.project5);
-      test.addFile('a@1', './file1.js', 'const r = require;\n const s = \'');
-      test.addFile('a@1', './file2.js', 'const net = require(\'net\');');
+      test.addFile('a@1', './file1.js', 'const r = require;\n const s = "');
+      test.addFile('a@1', './file2.js', 'const net = require("net");');
       const testPath: string = await test.create();
       const a1Path = path.join(testPath, 'a@1');
       const a1Node =
@@ -183,11 +183,11 @@ test(
     'end-to-end: should generate a package tree with points of interest',
     async t => {
       const test = new util.TestProject(testCases.project1);
-      test.addFile('a@1', './a1File1.js', 'const r = require;\n const s = \'');
-      test.addFile('a@1', './a1File2.js', 'const net = require(\'net\');');
-      test.addFile('c@2', './c2File1.js', 'console.log(\'this file is ok\');');
-      test.addFile('c@1', './c1File1.js', 'console.log(\'this file is ok\')');
-      test.addFile('c@1', './c1File2.js', 'const r = require(\'fs\')');
+      test.addFile('a@1', './a1File1.js', 'const r = require;\n const s = "');
+      test.addFile('a@1', './a1File2.js', 'const net = require("net");');
+      test.addFile('c@2', './c2File1.js', 'console.log("this file is ok");');
+      test.addFile('c@1', './c1File1.js', 'console.log("this file is ok")');
+      test.addFile('c@1', './c1File2.js', 'const r = require("fs")');
       const testPath = await test.create();
       const emptyPackageTree = await tree.generatePackageTree(testPath);
       const packageTreeWithPath =

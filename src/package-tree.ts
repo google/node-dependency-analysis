@@ -117,7 +117,8 @@ export async function getPackagePOIList(path: string):
     const functionArr: Function[] = [
       analysis.getIOModules, analysis.getArbitraryExecutionMods,
       analysis.unusualUsesOfRequire, analysis.getEvalCalls,
-      analysis.getEnvAccesses, analysis.getFunctionClassAccesses
+      analysis.getEnvAccesses, analysis.getFunctionClassAccesses,
+      analysis.getAccessesToGlobalProps
 
     ];
     const filePOIList = getPointsOfInterest(content, file, functionArr);
