@@ -131,3 +131,29 @@ export function getEnvAccesses(
       analysisUtil.getDynamicAccesses('process', acornTree, file);
   return [...envAccesses, ...obscuredProcessAccesses];
 }
+
+/**
+ * Returns Points Of Interest that indicate uses of the Function Class
+ *
+ * @param acornTree the AST of the file
+ * @param file the name of the file being checked
+ */
+export function getFunctionClassAccesses(acornTree: Node, file: string) {
+  const functionClassPOIs: PointOfInterest[] = [];
+
+  const functionClassUsages: Node[] =
+      analysisUtil.findCallee('Function', acornTree);
+  functionClassUsages.forEach((node) => {
+    const functionClassPOI = analysisUtil.createPOI(
+        'Function constructor usage', file, analysisUtil.getPosition(node));
+    functionClassPOIs.push(functionClassPOI);
+  });
+
+  const functionAliases: PointOfInterest[] =
+      analysisUtil.locateAliases(acornTree, file, 'Function');
+
+  const functionPropAccesses: PointOfInterest[] =
+      analysisUtil.locatePropAccessesOfFuncs(acornTree, file, 'Function');
+
+  return [...functionClassPOIs, ...functionAliases, ...functionPropAccesses];
+}

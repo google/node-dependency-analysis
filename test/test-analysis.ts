@@ -346,3 +346,42 @@ test(
 function parse(contents: string) {
   return acorn.parse(contents, {allowHashBang: true, locations: true});
 }
+
+test(
+    'getFunctionClassAccesses should return POIs when there is a call ' +
+        'to the Function constructor',
+    async t => {
+      const content1 = 'const a = new Function(\'a\', doSomethingBad);';
+      const acornTree1 = parse(content1);
+      const result1 = analysis.getFunctionClassAccesses(acornTree1, 'file');
+      t.deepEqual(result1.length, 1);
+      t.deepEqual(result1[0].type, 'Function constructor usage');
+
+      const content2 = 'const a = Function(\'a\', doSomethingBad);';
+      const acornTree2 = parse(content2);
+      const result2 = analysis.getFunctionClassAccesses(acornTree2, 'file');
+      t.deepEqual(result2.length, 1);
+      t.deepEqual(result2[0].type, 'Function constructor usage');
+    });
+
+test(
+    'getFunctionClassAccesses should return POIs when the properties ' +
+        'of Function are being accessed',
+    async t => {
+      const content = 'const a = Function.prototype.call(require, \'http\');';
+      const acornTree = parse(content);
+      const result = analysis.getFunctionClassAccesses(acornTree, 'file');
+      t.deepEqual(result.length, 1);
+      t.deepEqual(result[0].type, 'Access to a property of Function');
+    });
+
+test(
+    'getFunctionClassAccesses should return POIs when Function ' +
+        'is assigned to a variable',
+    async t => {
+      const content = 'const a = Function;';
+      const acornTree = parse(content);
+      const result = analysis.getFunctionClassAccesses(acornTree, 'file');
+      t.deepEqual(result.length, 1);
+      t.deepEqual(result[0].type, 'Obfuscated Function identifier');
+    });

@@ -15,7 +15,7 @@
  */
 
 // This file will hold all the functions that do analysis of packages.
-import {CallExpression, MemberExpression, Node} from 'estree';
+import {CallExpression, MemberExpression, NewExpression, Node} from 'estree';
 
 import {PointOfInterest, Position} from './package-tree';
 
@@ -39,6 +39,11 @@ export function findCallee(id: string, tree: Node): Node[] {
     CallExpression(e: CallExpression) {
       if (e.callee.type === 'Identifier' && e.callee.name === id) {
         calleeUsages.push(e.arguments[0]);
+      }
+    },
+    NewExpression(e: NewExpression) {
+      if (e.callee.type === 'Identifier' && e.callee.name === id) {
+        calleeUsages.push(e);
       }
     }
   });
