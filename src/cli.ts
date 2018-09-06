@@ -17,7 +17,7 @@
 import meow from 'meow';
 
 import {outputToUser} from './output';
-import * as tree from './package-tree';
+import * as graph from './package-graph';
 import * as util from './util';
 
 const cli = meow({
@@ -67,13 +67,13 @@ async function run(
     process.exit(1);
   }
 
-  // Step 3: create package tree - generatePackageTree or main function
-  const emptyPackageTree = await tree.generatePackageTree(packageRootDir);
-  const packageTreeWithPath =
-      await tree.resolvePaths(emptyPackageTree, packageRootDir);
-  const packageTreeWithPOI =
-      await tree.populatePOIInPackageTree(packageTreeWithPath);
+  // Step 3: create package graph - generatePackageGraph or main function
+  const emptyPackageGraph = await graph.generatePackageGraph(packageRootDir);
+  const packageGraphWithPath =
+      await graph.resolvePaths(emptyPackageGraph, packageRootDir);
+  const packageGraphWithPOI =
+      await graph.populatePOIInPackageGraph(packageGraphWithPath);
 
   // Step 4: output
-  outputToUser(packageTreeWithPOI, flags.verbose);
+  outputToUser(packageGraphWithPOI, flags.verbose);
 }

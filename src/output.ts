@@ -15,50 +15,50 @@
  */
 
 import chalk from 'chalk';
-import * as path from 'path';
 import semver from 'semver';
 
 import {getNumberOfTransitiveDetections, squashDetections} from './output-util';
-import {PackageTree, PointOfInterest} from './package-tree';
+import {PackageGraph, PointOfInterest} from './package-graph';
 
 // File to output to user
 export function outputToUser(
-    packageTree: PackageTree<PointOfInterest[]>, verbose = false) {
+    packageGraph: PackageGraph<PointOfInterest[]>, verbose = false) {
   const sortedModules =
-      flattenPackageTree(
-          packageTree, new Map<string, PackageTree<PointOfInterest[]>>())
+      flattenPackageGraph(
+          packageGraph, new Map<string, PackageGraph<PointOfInterest[]>>())
           .sort(compare);
 
   console.log(output(sortedModules, verbose));
 }
 
-function flattenPackageTree(
-    packageTree: PackageTree<PointOfInterest[]>,
-    flattenedTrees: Map<string, PackageTree<PointOfInterest[]>>):
-    Array<PackageTree<PointOfInterest[]>> {
-  const combined: Array<PackageTree<PointOfInterest[]>> = [];
-  // Check to make sure that this packageTree has not already been added
-  if (!flattenedTrees.has(`${packageTree.name} ${packageTree.version}`)) {
-    combined.push(packageTree);
-    flattenedTrees.set(
-        `${packageTree.name} ${packageTree.version}`, packageTree);
-    packageTree.dependencies.forEach((dep) => {
-      combined.push(...flattenPackageTree(dep, flattenedTrees));
+function flattenPackageGraph(
+    packageGraph: PackageGraph<PointOfInterest[]>,
+    flattenedGraphs: Map<string, PackageGraph<PointOfInterest[]>>):
+    Array<PackageGraph<PointOfInterest[]>> {
+  const combined: Array<PackageGraph<PointOfInterest[]>> = [];
+  // Check to make sure that this packageGraph has not already been added
+  if (!flattenedGraphs.has(`${packageGraph.name} ${packageGraph.version}`)) {
+    combined.push(packageGraph);
+    flattenedGraphs.set(
+        `${packageGraph.name} ${packageGraph.version}`, packageGraph);
+    packageGraph.dependencies.forEach((dep) => {
+      combined.push(...flattenPackageGraph(dep, flattenedGraphs));
     });
   }
   return combined;
 }
 
 function output(
-    packageTrees: Array<PackageTree<PointOfInterest[]>>,
+    packageGraphs: Array<PackageGraph<PointOfInterest[]>>,
     verbose: boolean): string {
   const arrOfStrings: string[] = [];
-  packageTrees.forEach((packageTree) => {
-    arrOfStrings.push(`${packageTree.name} ${packageTree.version} Detections: ${
-        packageTree.data.length} Immediate ${
-        getNumberOfTransitiveDetections(packageTree)} Transitive`);
+  packageGraphs.forEach((packageGraph) => {
+    arrOfStrings.push(
+        `${packageGraph.name} ${packageGraph.version} Detections: ${
+            packageGraph.data.length} Immediate ${
+            getNumberOfTransitiveDetections(packageGraph)} Transitive`);
     if (verbose) {
-      packageTree.data.forEach((dataPoint) => {
+      packageGraph.data.forEach((dataPoint) => {
         arrOfStrings.push(getColorFromType(
             dataPoint.type,
             `     ${dataPoint.type} found in ${
@@ -66,9 +66,9 @@ function output(
                     'node_modules/')[1]}:${dataPoint.position.lineStart}`));
       });
     } else {
-      if (packageTree.data.length > 0) {
+      if (packageGraph.data.length > 0) {
         arrOfStrings.push(`  Detected Patterns:`);
-        const squashedDetections = squashDetections(packageTree);
+        const squashedDetections = squashDetections(packageGraph);
         for (const type of squashedDetections) {
           if (type[1] > 1) {
             arrOfStrings.push(getColorFromType(
@@ -83,7 +83,7 @@ function output(
     // dependencies field to save space
     let dependencyFound = false;
 
-    packageTree.dependencies.forEach((dep) => {
+    packageGraph.dependencies.forEach((dep) => {
       if (dep.data.length > 0 || getNumberOfTransitiveDetections(dep) > 0) {
         if (!dependencyFound) {
           arrOfStrings.push(`  Dependencies:`);
@@ -106,8 +106,8 @@ function output(
  * @param b 2nd package
  */
 function compare(
-    a: PackageTree<PointOfInterest[]>,
-    b: PackageTree<PointOfInterest[]>): number {
+    a: PackageGraph<PointOfInterest[]>,
+    b: PackageGraph<PointOfInterest[]>): number {
   if (a.name < b.name) {
     return -1;
   }
@@ -158,5 +158,14 @@ const typeTable: {[type: string]: number} = {
   'Obscured process property': 3,
   'Obfuscated process identifier': 3,
   'Obscured process object': 3,
-  'Dynamic Require Call': 3
+  'Dynamic Require Call': 3,
+  'Function constructor usage': 3,
+  'Access to a property of Function': 3,
+  'Obfuscated Function identifier': 3,
+  'Obfuscated global identifier': 2,
+  'Obscured global property': 3,
+  'Access to global.eval': 3,
+  'Access to global.require': 3,
+  'Access to global.Function': 3
+
 };

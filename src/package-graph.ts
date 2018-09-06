@@ -43,11 +43,11 @@ export interface Position {
   colEnd: number;
 }
 
-export interface PackageTree<T = null> {
+export interface PackageGraph<T = null> {
   name: string;
   version: string;
   data: T;
-  dependencies: Array<PackageTree<T>>;
+  dependencies: Array<PackageGraph<T>>;
 }
 
 export interface PackageLock {
@@ -72,40 +72,41 @@ export interface Dependency {
 }
 
 /**
- * Replaces the data of each node in the packageTree with the Points Of
+ * Replaces the data of each node in the packageGraph with the Points Of
  * Interest array
  *
- * @param packageTree the original package tree with data property as the
+ * @param packageGraph the original package graph with data property as the
  *    node's path
  */
-export async function populatePOIInPackageTree(
-    packageTree: PackageTree<string>): Promise<PackageTree<PointOfInterest[]>> {
-  // Get package trees with POI arrays in data field
-  const dependenciesWithPOI: Array<PackageTree<PointOfInterest[]>> = [];
-  await Promise.all(packageTree.dependencies.map(async (pkg) => {
-    const dependencyPOIList: PackageTree<PointOfInterest[]> =
-        await populatePOIInPackageTree(pkg);
+export async function populatePOIInPackageGraph(
+    packageGraph: PackageGraph<string>):
+    Promise<PackageGraph<PointOfInterest[]>> {
+  // Get package graphs with POI arrays in data field
+  const dependenciesWithPOI: Array<PackageGraph<PointOfInterest[]>> = [];
+  await Promise.all(packageGraph.dependencies.map(async (pkg) => {
+    const dependencyPOIList: PackageGraph<PointOfInterest[]> =
+        await populatePOIInPackageGraph(pkg);
     dependenciesWithPOI.push(dependencyPOIList);
   }));
 
   // Get the POI list for this current package
-  const poiList: PointOfInterest[] = await getPackagePOIList(packageTree.data);
+  const poiList: PointOfInterest[] = await getPackagePOIList(packageGraph.data);
 
-  // Create new tree using POI list as data and new list of package trees as
+  // Create new graph using POI list as data and new list of package graphs as
   // dependencies
-  const tree: PackageTree<PointOfInterest[]> = {
-    name: packageTree.name,
-    version: packageTree.version,
+  const graph: PackageGraph<PointOfInterest[]> = {
+    name: packageGraph.name,
+    version: packageGraph.version,
     data: poiList,
     dependencies: dependenciesWithPOI
   };
-  return tree;
+  return graph;
 }
 
 /**
- * Gets a packageTree node's Points of Interest array
+ * Gets a packageGraph node's Points of Interest array
  *
- * @param path the path to the packageTree node
+ * @param path the path to the packageGraph node
  */
 export async function getPackagePOIList(path: string):
     Promise<PointOfInterest[]> {
@@ -129,17 +130,17 @@ export async function getPackagePOIList(path: string):
 }
 
 /**
- * Creates a new packageTree node with a new data property that contains
+ * Creates a new packageGraph node with a new data property that contains
  * the path to the package and replaces its dependency property with updated
- * packageTree nodes
+ * packageGraph nodes
  *
- * @param rootNode the original packageTree root node
+ * @param rootNode the original packageGraph root node
  * @param rootPath the path to the root node
  */
 export async function resolvePaths(
-    rootNode: PackageTree, rootPath: string): Promise<PackageTree<string>> {
-  const updatedNodesMap = new Map<string, PackageTree<string>>();
-  const resolvedNodes: Array<PackageTree<string>> = [];
+    rootNode: PackageGraph, rootPath: string): Promise<PackageGraph<string>> {
+  const updatedNodesMap = new Map<string, PackageGraph<string>>();
+  const resolvedNodes: Array<PackageGraph<string>> = [];
 
   await Promise.all(rootNode.dependencies.map(async (child) => {
     const resolvedDependency =
@@ -147,7 +148,7 @@ export async function resolvePaths(
     resolvedNodes.push(resolvedDependency);
   }));
 
-  const updatedRoot: PackageTree<string> = {
+  const updatedRoot: PackageGraph<string> = {
     name: rootNode.name,
     version: rootNode.version,
     data: rootPath,
@@ -157,10 +158,10 @@ export async function resolvePaths(
   return updatedRoot;
 
   async function resolvePathsRec(
-      packageNode: PackageTree, parentPath: string,
-      updatedNodesMap: Map<string, PackageTree<string>>):
-      Promise<PackageTree<string>> {
-    const resolvedNodes: Array<PackageTree<string>> = [];
+      packageNode: PackageGraph, parentPath: string,
+      updatedNodesMap: Map<string, PackageGraph<string>>):
+      Promise<PackageGraph<string>> {
+    const resolvedNodes: Array<PackageGraph<string>> = [];
 
     const path: string = await findPath(packageNode.name, parentPath);
     await Promise.all(packageNode.dependencies.map(async (child) => {
@@ -169,7 +170,7 @@ export async function resolvePaths(
 
     // creates new node if node doesn't exist already
     if (!updatedNodesMap.has(path)) {
-      const updatedNode: PackageTree<string> = {
+      const updatedNode: PackageGraph<string> = {
         name: packageNode.name,
         version: packageNode.version,
         data: path,
@@ -258,13 +259,13 @@ function getPointsOfInterest(
 
 /**
  * Takes in the root directory of a project and returns returns a
- * PackageTree<null>
+ * PackageGraph<null>
  * @param rootDir The project's root directory.
  * Will fail if there is no package.json and package-lock.json in this directory
  */
-export async function generatePackageTree(
+export async function generatePackageGraph(
     rootDir: string,
-    customReadFilep: ReadFileP = readFilep): Promise<PackageTree> {
+    customReadFilep: ReadFileP = readFilep): Promise<PackageGraph> {
   // Step 0: read in package.json and package-lock.json
   const pjsonPath = path.join(rootDir, 'package.json');
   const pjson = await customReadFilep(pjsonPath, 'utf8');
@@ -276,22 +277,22 @@ export async function generatePackageTree(
   const packageLockJson: PackageLock = JSON.parse(pjsonLock);
 
   // Step 1: Initialize fields
-  const rootMap = new Map<string, PackageTree<null>>();
+  const rootMap = new Map<string, PackageGraph<null>>();
   const projectName = packageJson.name;
   const projectVersion = packageJson.version;
-  const treeHead: PackageTree = {
+  const graphHead: PackageGraph = {
     name: projectName,
     version: projectVersion,
     data: null,
     dependencies: []
   };
 
-  rootMap.set(projectName, treeHead);
+  rootMap.set(projectName, graphHead);
 
   // Step 2: Get the top level dependencies of packageLock
   if (!packageLockJson.dependencies) {
     // If there are no dependencies skip the checks below
-    return treeHead;
+    return graphHead;
   }
   /*
    * Hoisted dependencies are all the modules able to be depended on by any
@@ -309,7 +310,7 @@ export async function generatePackageTree(
     });
   }
 
-  // Step 3: Add the top level dependencies to treeHead.dependencies
+  // Step 3: Add the top level dependencies to graphHead.dependencies
   const rootRequires = Object.keys(packageJson.dependencies);
   for (const requiredModuleName of rootRequires) {
     // Sanity check
@@ -317,35 +318,35 @@ export async function generatePackageTree(
       throw new Error(
           'Dependencies of package.json and package-lock.json do not match');
     }
-    treeHead.dependencies.push(rootMap.get(requiredModuleName)!);
+    graphHead.dependencies.push(rootMap.get(requiredModuleName)!);
   }
 
   for (const dependency of hoistedDependencies) {
     if (packageLockJson.dependencies[dependency]) {
-      generatePackageTreeRec(
+      generatePackageGraphRec(
           dependency, packageLockJson.dependencies[dependency], [rootMap]);
     }
   }
 
-  return treeHead;
+  return graphHead;
 
   /**
-   * Creates a packageTree object for a given package
+   * Creates a packageGraph object for a given package
    * @param packageName The name of the package
    * @param packageObject This package's representation in package-lock.json.
    * Contains information regarding what this package requires and its
    * dependencies. It is of type Dependency because it is a dependency of the
    * root project.
    * @param dependenciesMap An array of Maps where the first element is a map of
-   * the highest level dependency's names and their corresponding packageTrees.
+   * the highest level dependency's names and their corresponding packageGraphs.
    * The next element is a level down and so on.
    */
-  function generatePackageTreeRec(
+  function generatePackageGraphRec(
       packageName: string, packageObject: Dependency,
-      dependenciesMap: Array<Map<string, PackageTree>>): PackageTree {
+      dependenciesMap: Array<Map<string, PackageGraph>>): PackageGraph {
     // Step 0: Create a map with all of this package's dependencies
-    const newMap = new Map<string, PackageTree>();
-    const currentPackageTree =
+    const newMap = new Map<string, PackageGraph>();
+    const currentPackageGraph =
         findEntryInMapArray(packageName, dependenciesMap);
     const dependencyKeys: string[] =
         Object.keys(packageObject.dependencies || {});
@@ -367,10 +368,10 @@ export async function generatePackageTree(
     dependenciesMap.push(newMap);
 
     // Step 1: Look at what the current module requires and add that to the
-    // dependencies array of our packageTree
+    // dependencies array of our packageGraph
     const requiresKeys = Object.keys(packageObject.requires || {});
     for (const requireKey of requiresKeys) {
-      currentPackageTree.dependencies.push(
+      currentPackageGraph.dependencies.push(
           findEntryInMapArray(requireKey, dependenciesMap));
     }
 
@@ -378,20 +379,20 @@ export async function generatePackageTree(
     for (const dependencyKey of dependencyKeys) {
       if (packageObject.dependencies &&
           packageObject.dependencies[dependencyKey]) {
-        generatePackageTreeRec(
+        generatePackageGraphRec(
             dependencyKey, packageObject.dependencies[dependencyKey],
             dependenciesMap);
       }
     }
     dependenciesMap.pop();
-    return currentPackageTree;
+    return currentPackageGraph;
   }
 }
 
 
 
 function findEntryInMapArray(
-    query: string, mapArray: Array<Map<string, PackageTree>>): PackageTree {
+    query: string, mapArray: Array<Map<string, PackageGraph>>): PackageGraph {
   for (let mapIndex = mapArray.length - 1; mapIndex >= 0; mapIndex--) {
     if (mapArray[mapIndex].has(query)) {
       return mapArray[mapIndex].get(query)!;

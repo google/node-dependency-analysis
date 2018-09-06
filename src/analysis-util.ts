@@ -17,25 +17,20 @@
 // This file will hold all the functions that do analysis of packages.
 import {CallExpression, MemberExpression, NewExpression, Node} from 'estree';
 
-import {PointOfInterest, Position} from './package-tree';
+import {PointOfInterest, Position} from './package-graph';
 
 const walk = require('acorn/dist/walk');
-
-export enum IdType {
-  CALLEE,
-  OBJECT
-}
 
 /**
  * Finds specified function identifier and returns an array of AST nodes that
  * they are located in
  *
  * @param id the identifier that is being searched for
- * @param tree abstract syntax tree
+ * @param acornTree abstract syntax tree
  */
-export function findCallee(id: string, tree: Node): Node[] {
+export function findCallee(id: string, acornTree: Node): Node[] {
   const calleeUsages: Node[] = [];
-  walk.simple(tree, {
+  walk.simple(acornTree, {
     CallExpression(e: CallExpression) {
       if (e.callee.type === 'Identifier' && e.callee.name === id) {
         calleeUsages.push(e.arguments[0]);
@@ -55,11 +50,11 @@ export function findCallee(id: string, tree: Node): Node[] {
  * they are located in
  *
  * @param name the name of the object
- * @param tree abstract syntax tree
+ * @param acornTree abstract syntax tree
  */
-export function findObject(name: string, tree: Node): MemberExpression[] {
+export function findObject(name: string, acornTree: Node): MemberExpression[] {
   const objectUsages: MemberExpression[] = [];
-  walk.simple(tree, {
+  walk.simple(acornTree, {
     MemberExpression(e: MemberExpression) {
       if (e.object.type === 'Identifier' && e.object.name === name) {
         objectUsages.push(e);

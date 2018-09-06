@@ -18,7 +18,7 @@ import * as acorn from 'acorn';
 import {Node} from 'estree';
 
 import * as analysisUtil from './analysis-util';
-import {PointOfInterest} from './package-tree';
+import {PointOfInterest} from './package-graph';
 
 /**
  * Gets a list of PointOfInterest objects, indicating that there were IO

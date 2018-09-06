@@ -1,10 +1,11 @@
-import {PackageTree, PointOfInterest} from './package-tree';
+import {PackageGraph, PointOfInterest} from './package-graph';
 
 export function getNumberOfTransitiveDetections(
-    packageTree: PackageTree<PointOfInterest[]>): number {
-  let totalDetections = packageTree.data.length;
-  const countedDependencies = new Map<string, PackageTree<PointOfInterest[]>>();
-  packageTree.dependencies.forEach((dep) => {
+    packageGraph: PackageGraph<PointOfInterest[]>): number {
+  let totalDetections = packageGraph.data.length;
+  const countedDependencies =
+      new Map<string, PackageGraph<PointOfInterest[]>>();
+  packageGraph.dependencies.forEach((dep) => {
     totalDetections +=
         getNumberOfTransitiveDetectionsRec(dep, countedDependencies);
   });
@@ -12,11 +13,11 @@ export function getNumberOfTransitiveDetections(
 
 
   function getNumberOfTransitiveDetectionsRec(
-      packageTree: PackageTree<PointOfInterest[]>,
-      countedDependencies: Map<string, PackageTree<PointOfInterest[]>>):
+      packageGraph: PackageGraph<PointOfInterest[]>,
+      countedDependencies: Map<string, PackageGraph<PointOfInterest[]>>):
       number {
-    let totalDetections = packageTree.data.length;
-    packageTree.dependencies.forEach((dep) => {
+    let totalDetections = packageGraph.data.length;
+    packageGraph.dependencies.forEach((dep) => {
       if (!countedDependencies.has(`${dep.name} ${dep.version}`)) {
         countedDependencies.set(`${dep.name} ${dep.version}`, dep);
         totalDetections +=
@@ -27,9 +28,9 @@ export function getNumberOfTransitiveDetections(
   }
 }
 
-export function squashDetections(packageTree: PackageTree<PointOfInterest[]>):
+export function squashDetections(packageGraph: PackageGraph<PointOfInterest[]>):
     Map<string, number> {
-  const sortedDataArray = packageTree.data.slice(0).sort(compare);
+  const sortedDataArray = packageGraph.data.slice(0).sort(compare);
   const squashedDetections: Map<string, number> = new Map();
   for (const point of sortedDataArray) {
     if (squashedDetections.has(point.type)) {

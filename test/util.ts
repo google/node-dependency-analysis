@@ -58,7 +58,7 @@ export class NVT {
 export type NameVersionTuple = string;
 
 /**
- * A structure that represents a package's dependency tree. Keys must be either
+ * A structure that represents a package's dependency graph. Keys must be either
  * '*' or a NameVersionTuple. Values specify the module's own dependencies.
  */
 export type DependencyGraph = {

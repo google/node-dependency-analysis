@@ -16,14 +16,14 @@
 import test, {GenericTestContext} from 'ava';
 import path from 'path';
 
-import * as tree from '../src/package-tree';
-import {generatePackageTree, PackageTree} from '../src/package-tree';
+import * as graph from '../src/package-graph';
+import {generatePackageGraph, PackageGraph} from '../src/package-graph';
 
 import {testCases} from './mock-projects';
 import * as util from './util';
 
 test(
-    'the data property of the package tree should ' +
+    'the data property of the package graph should ' +
         'get the correct path to the package (test 1/3)',
     async t => {
       // See how the dependency graph looks in test-projects
@@ -35,19 +35,19 @@ test(
       const b1 = {name: 'b', version: '1.0.0', data: null, dependencies: [c1]};
       const a1 =
           {name: 'a', version: '1.0.0', data: null, dependencies: [b1, c1]};
-      const root: tree.PackageTree =
+      const root: graph.PackageGraph =
           {name: 'root', version: '1.0.0', data: null, dependencies: [a1, c2]};
 
-      const resolvedTree: tree.PackageTree<string> =
-          await tree.resolvePaths(root, testPath);
+      const resolvedGraph: graph.PackageGraph<string> =
+          await graph.resolvePaths(root, testPath);
 
-      checkPjsons(resolvedTree, t, testCases.project1);
+      checkPjsons(resolvedGraph, t, testCases.project1);
 
       testProject.cleanup();
     });
 
 test(
-    'the data property of the package tree should ' +
+    'the data property of the package graph should ' +
         'get the correct path to the package (test 2/3)',
     async t => {
       const test = new util.TestProject(testCases.project2);
@@ -58,15 +58,15 @@ test(
       const a1 = {name: 'a', version: '1.0.0', data: null, dependencies: [c1]};
       const root =
           {name: 'root', version: '1.0.0', data: null, dependencies: [a1, b1]};
-      const resolvedTree: tree.PackageTree<string> =
-          await tree.resolvePaths(root, testPath);
-      checkPjsons(resolvedTree, t, testCases.project2);
+      const resolvedGraph: graph.PackageGraph<string> =
+          await graph.resolvePaths(root, testPath);
+      checkPjsons(resolvedGraph, t, testCases.project2);
 
       test.cleanup();
     });
 
 test(
-    'the data property of the package tree should ' +
+    'the data property of the package graph should ' +
         'get the correct path to the package (test 3/3)',
     async t => {
       const test = new util.TestProject(testCases.project3);
@@ -78,9 +78,9 @@ test(
       const root =
           {name: 'root', version: '1.0.0', data: null, dependencies: [a1]};
 
-      const resolvedTree: tree.PackageTree<string> =
-          await tree.resolvePaths(root, testPath);
-      checkPjsons(resolvedTree, t, testCases.project3);
+      const resolvedGraph: graph.PackageGraph<string> =
+          await graph.resolvePaths(root, testPath);
+      checkPjsons(resolvedGraph, t, testCases.project3);
       test.cleanup();
     });
 
@@ -92,7 +92,7 @@ test(
       test.addFile('b@1', './build/cli.js', 'console.log()');
       const testPath: string = await test.create();
       const a1Dir = path.join(testPath, 'a@1');
-      const a1Files = await tree.getJSFiles(a1Dir);
+      const a1Files = await graph.getJSFiles(a1Dir);
       t.false(
           a1Files.includes(path.join('node_modules', 'b@1/src/src2/index.js')));
       test.cleanup();
@@ -107,7 +107,7 @@ test(
       test.addFile('b@1', './build/cli.js', 'console.log()');
       const testPath: string = await test.create();
       const b1Dir = path.join(testPath, 'b@1');
-      const b1Files = await tree.getJSFiles(b1Dir);
+      const b1Files = await graph.getJSFiles(b1Dir);
       t.true(b1Files.includes(path.join(b1Dir, 'src/src2/index.js')));
       t.true(b1Files.includes(path.join(b1Dir, 'build/cli.js')));
       t.false(b1Files.includes(path.join(b1Dir, 'util.ts')));
@@ -120,14 +120,15 @@ test(
     });
 
 test(
-    'the package tree should be populated with Points of Interest', async t => {
+    'the package graph should be populated with Points of Interest',
+    async t => {
       const test = new util.TestProject(testCases.project5);
       test.addFile('a@1', './file1.js', 'const r = require;\n');
       test.addFile('a@1', './file2.js', 'const h = require("http");');
       const testPath: string = await test.create();
       const p = path.join(testPath, 'a@1');
       const n = {name: 'a', version: '1.0.0', data: p, dependencies: []};
-      const updatedA1Node = await tree.populatePOIInPackageTree(n);
+      const updatedA1Node = await graph.populatePOIInPackageGraph(n);
       t.deepEqual(updatedA1Node.data.length, 2);
       t.true(updatedA1Node.data.some((pkg) => {
         return pkg.type === 'Obfuscated require identifier' &&
@@ -140,7 +141,7 @@ test(
     });
 
 test(
-    'the package tree should return only a syntax poi for a ' +
+    'graph' +
         'file if there is a syntax error',
     async t => {
       const test = new util.TestProject(testCases.project5);
@@ -150,7 +151,7 @@ test(
       const a1Path = path.join(testPath, 'a@1');
       const a1Node =
           {name: 'a', version: '1.0.0', data: a1Path, dependencies: []};
-      const updatedA1Node = await tree.populatePOIInPackageTree(a1Node);
+      const updatedA1Node = await graph.populatePOIInPackageGraph(a1Node);
       t.deepEqual(updatedA1Node.data.length, 2);
       t.true(updatedA1Node.data.some((pkg) => {
         return pkg.type === 'Syntax Error' &&
@@ -167,20 +168,17 @@ test(
       test.cleanup();
     });
 
-test(
-    'generatePackageTree throws an error if it can not find a file',
-    async t => {
-      const fakeReadFilep = () => {
-        throw new Error('File Not Found');
-      };
+test('generatePackageGraph', async t => {
+  const fakeReadFilep = () => {
+    throw new Error('File Not Found');
+  };
 
-      await t.throws(
-          tree.generatePackageTree('.', fakeReadFilep), Error,
-          'File Not Found');
-    });
+  await t.throws(
+      graph.generatePackageGraph('.', fakeReadFilep), Error, 'File Not Found');
+});
 
 test(
-    'end-to-end: should generate a package tree with points of interest',
+    'end-to-end: should generate a package graph with points of interest',
     async t => {
       const test = new util.TestProject(testCases.project1);
       test.addFile('a@1', './a1File1.js', 'const r = require;\n const s = "');
@@ -189,14 +187,14 @@ test(
       test.addFile('c@1', './c1File1.js', 'console.log("this file is ok")');
       test.addFile('c@1', './c1File2.js', 'const r = require("fs")');
       const testPath = await test.create();
-      const emptyPackageTree = await tree.generatePackageTree(testPath);
-      const packageTreeWithPath =
-          await tree.resolvePaths(emptyPackageTree, testPath);
-      const packageTreeWithPOI =
-          await tree.populatePOIInPackageTree(packageTreeWithPath);
+      const emptyPackageGraph = await graph.generatePackageGraph(testPath);
+      const packageGraphWithPath =
+          await graph.resolvePaths(emptyPackageGraph, testPath);
+      const packageGraphWithPOI =
+          await graph.populatePOIInPackageGraph(packageGraphWithPath);
 
       // a@1 tests
-      const a1Package = packageTreeWithPOI.dependencies.filter((dep) => {
+      const a1Package = packageGraphWithPOI.dependencies.filter((dep) => {
         return dep.name === 'a' && dep.version === 'file:a@1';
       });
       t.deepEqual(a1Package[0].dependencies.length, 1);
@@ -212,7 +210,7 @@ test(
       }));
 
       // c@2 tests
-      const c2Folder = packageTreeWithPOI.dependencies.filter((dep) => {
+      const c2Folder = packageGraphWithPOI.dependencies.filter((dep) => {
         return dep.name === 'c' && dep.version === 'file:c@2';
       });
       t.deepEqual(c2Folder[0].dependencies.length, 0);
@@ -233,7 +231,7 @@ test(
       }));
 
       // b@1 tests
-      const b1Package = packageTreeWithPOI.dependencies.filter((dep) => {
+      const b1Package = packageGraphWithPOI.dependencies.filter((dep) => {
         return dep.name === 'b' && dep.version === 'file:b@1';
       });
       t.deepEqual(b1Package[0].dependencies.length, 1);
@@ -244,7 +242,8 @@ test(
     });
 
 test(
-    'generatePackageTree should return a populated PackageTree given a project name and its root directory',
+    'generatePackageGraph should return a populated PackageGraph given a ' +
+        'project name and its root directory',
     async t => {
       const mockProjectKeys = Object.keys(testCases);
       for (const mockProjectKey of mockProjectKeys) {
@@ -254,28 +253,29 @@ test(
     });
 
 test(
-    'generatePackageTree does not create duplicates of the same module when multiple modules depend on it',
+    'generatePackageGraph does not create duplicates of the same module ' +
+        'when multiple modules depend on it',
     async t => {
       const testProject = new util.TestProject(testCases.project7);
       const testPath = await testProject.create();
-      const packageTreeResult = await generatePackageTree(testPath);
+      const packageGraphResult = await generatePackageGraph(testPath);
       t.true(
-          packageTreeResult.dependencies[0].dependencies[0] ===
-          packageTreeResult.dependencies[1].dependencies[0]);
+          packageGraphResult.dependencies[0].dependencies[0] ===
+          packageGraphResult.dependencies[1].dependencies[0]);
       testProject.cleanup();
     });
 
 /**
- * Generates a PackageTree given a TestProject object
+ * Generates a PackageGraph given a TestProject object
  * @param testProjectObj the object passed to the TestProject constructor
  */
-function generateExpectedTree(testProjectObj: util.DependencyGraph):
-    PackageTree<null> {
+function generateExpectedGraph(testProjectObj: util.DependencyGraph):
+    PackageGraph<null> {
   const keys = Object.keys(testProjectObj).sort();
-  const createdPackageTrees = new Map<string, PackageTree>();
-  const treeHead =
+  const createdPackageGraphs = new Map<string, PackageGraph>();
+  const graphHead =
       {name: 'test-project', version: '0.0.0', data: null, dependencies: []};
-  createdPackageTrees.set('*', treeHead);
+  createdPackageGraphs.set('*', graphHead);
 
   // Skip the root, because it was added above
   for (let keyIndex = 1; keyIndex < keys.length; keyIndex++) {
@@ -286,22 +286,23 @@ function generateExpectedTree(testProjectObj: util.DependencyGraph):
       data: null,
       dependencies: []
     };
-    createdPackageTrees.set(keys[keyIndex], pkgT);
+    createdPackageGraphs.set(keys[keyIndex], pkgT);
   }
   for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
-    const currentPackageTree = createdPackageTrees.get(keys[keyIndex]);
-    if (currentPackageTree) {
+    const currentPackageGraph = createdPackageGraphs.get(keys[keyIndex]);
+    if (currentPackageGraph) {
       const dependencies = testProjectObj[keys[keyIndex]];
       dependencies.forEach(element => {
-        if (!createdPackageTrees.has(element)) {
+        if (!createdPackageGraphs.has(element)) {
           throw new Error(
               `Dependency ${element} is not present in this test project.`);
         }
-        currentPackageTree.dependencies.push(createdPackageTrees.get(element)!);
+        currentPackageGraph.dependencies.push(createdPackageGraphs.get(element)!
+        );
       });
     }
   }
-  return treeHead;
+  return graphHead;
 }
 
 /**
@@ -314,8 +315,8 @@ async function testFunctionCreator(testProjectName: string):
   const testGraph = testCases[testProjectName];
   const testProject = new util.TestProject(testGraph);
   const testProjectPath = await testProject.create();
-  const actualResult = await generatePackageTree(testProjectPath);
-  const expectedResult = generateExpectedTree(testGraph);
+  const actualResult = await generatePackageGraph(testProjectPath);
+  const expectedResult = generateExpectedGraph(testGraph);
   testProject.cleanup();
   return {
     testGraph,
@@ -330,26 +331,27 @@ async function testFunctionCreator(testProjectName: string):
  * testGraph: The dependency graph used for this test
  * testProject: The TestProject object created for this test
  * testProjectPath: The path to the root of the TestProject created
- * actualResult: A PackageTree generated from generatePackageTree
- * expectedResult: A PackageTree generated from generateExpectedPackageTree
+ * actualResult: A PackageGraph generated from generatePackageGraph
+ * expectedResult: A PackageGraph generated from generateExpectedPackageGraph
  */
 interface TestResults {
   testGraph: util.DependencyGraph;
   testProject: util.TestProject;
   testProjectPath: string;
-  actualResult: tree.PackageTree<null>;
-  expectedResult: tree.PackageTree<null>;
+  actualResult: graph.PackageGraph<null>;
+  expectedResult: graph.PackageGraph<null>;
 }
 
 /**
  * Recursive function that creates a map of packages where the key is the
- * name and version, and the value is the corresponding package tree
+ * name and version, and the value is the corresponding package graph
  *
- * @param pkg the current package tree
+ * @param pkg the current package graph
  * @param map the map holding resolved packages
  */
 function createPackageMap(
-    pkg: tree.PackageTree<string>, map: Map<string, tree.PackageTree<string>>) {
+    pkg: graph.PackageGraph<string>,
+    map: Map<string, graph.PackageGraph<string>>) {
   pkg.dependencies.forEach((p) => {
     createPackageMap(p, map);
   });
@@ -358,16 +360,16 @@ function createPackageMap(
 }
 
 /**
- * Checks that all nodes in a package tree hold the correct path
+ * Checks that all nodes in a package graph hold the correct path
  *
- * @param pkg the root of the package tree
+ * @param pkg the root of the package graph
  * @param t the object used for tests
  * @param project an object that lists package dependents and dependencies
  */
 function checkPjsons<T>(
-    pkg: tree.PackageTree<string>, t: GenericTestContext<T>,
+    pkg: graph.PackageGraph<string>, t: GenericTestContext<T>,
     project: util.DependencyGraph) {
-  let map = new Map<string, tree.PackageTree<string>>();
+  let map = new Map<string, graph.PackageGraph<string>>();
   map = createPackageMap(pkg, map);
 
   for (const key in project) {
