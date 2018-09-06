@@ -62,8 +62,8 @@ function output(
         arrOfStrings.push(getColorFromType(
             dataPoint.type,
             `     ${dataPoint.type} found in ${
-                dataPoint.fileName.split('node_modules/')[1]} at ${
-                JSON.stringify(dataPoint.position, null, 1)}`));
+                dataPoint.fileName.split(
+                    'node_modules/')[1]}:${dataPoint.position.lineStart}`));
       });
     } else {
       if (packageTree.data.length > 0) {
