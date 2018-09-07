@@ -131,11 +131,12 @@ test(
       const updatedA1Node = await graph.populatePOIInPackageGraph(n);
       t.deepEqual(updatedA1Node.data.length, 2);
       t.true(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'Obfuscated require identifier' &&
+        return pkg.type === 'valueReassignment-require' &&
             pkg.fileName === path.join(p, 'file1.js');
       }));
       t.true(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'http' && pkg.fileName === path.join(p, 'file2.js');
+        return pkg.type === 'requiredModule-http' &&
+            pkg.fileName === path.join(p, 'file2.js');
       }));
       test.cleanup();
     });
@@ -154,15 +155,15 @@ test(
       const updatedA1Node = await graph.populatePOIInPackageGraph(a1Node);
       t.deepEqual(updatedA1Node.data.length, 2);
       t.true(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'Syntax Error' &&
+        return pkg.type === 'unprocessed-syntaxError' &&
             pkg.fileName === path.join(a1Path, 'file1.js');
       }));
       t.false(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'Obfuscated require identifier' &&
+        return pkg.type === 'valueReassignment-require' &&
             pkg.fileName === path.join(a1Path, 'file1.js');
       }));
       t.true(updatedA1Node.data.some((pkg) => {
-        return pkg.type === 'net' &&
+        return pkg.type === 'requiredModule-net' &&
             pkg.fileName === path.join(a1Path, 'file2.js');
       }));
       test.cleanup();
@@ -201,11 +202,11 @@ test(
       const a1Data = a1Package[0].data;
       t.deepEqual(a1Data.length, 2);
       t.true(a1Data.some((pkg) => {
-        return pkg.type === 'Syntax Error' &&
+        return pkg.type === 'unprocessed-syntaxError' &&
             pkg.fileName === path.join(testPath, 'node_modules/a/a1File1.js');
       }));
       t.true(a1Data.some((pkg) => {
-        return pkg.type === 'net' &&
+        return pkg.type === 'requiredModule-net' &&
             pkg.fileName === path.join(testPath, 'node_modules/a/a1File2.js');
       }));
 
@@ -225,7 +226,7 @@ test(
       const c1Data = c1Package[0].data;
       t.deepEqual(c1Data.length, 1);
       t.true(c1Data.some((pkg) => {
-        return pkg.type === 'fs' &&
+        return pkg.type === 'requiredModule-fs' &&
             pkg.fileName ===
             path.join(testPath, 'node_modules/a/node_modules/c/c1File2.js');
       }));

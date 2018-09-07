@@ -18,6 +18,7 @@
 import {CallExpression, MemberExpression, NewExpression, Node} from 'estree';
 
 import {PointOfInterest, Position} from './package-graph';
+import * as poiTypes from './poi-types';
 
 const walk = require('acorn/dist/walk');
 
@@ -81,7 +82,9 @@ export function getAccesses(
   const positionsOfPropAccesses: Position[] =
       locatePropertyAccesses(property, objectUsages);
   positionsOfPropAccesses.forEach((pos) => {
-    accesses.push(createPOI(`Access to ${object}.${property}`, file, pos));
+    accesses.push(createPOI(
+        `${poiTypes.SPECIFIC_PROPERTY_ACCESS}-${object}.${property}`, file,
+        pos));
   });
 
   return accesses;
@@ -102,7 +105,8 @@ export function getDynamicAccesses(
   const obscuredProperties: Position[] =
       locateIndexPropertyAccesses(objectUsages);
   obscuredProperties.forEach((pos) => {
-    dynamicAccesses.push(createPOI(`Obscured ${object} property`, file, pos));
+    dynamicAccesses.push(
+        createPOI(`${poiTypes.DYNAMIC_PROPERTY}-${object}`, file, pos));
   });
 
   const obscuredObjects: PointOfInterest[] =
@@ -182,7 +186,7 @@ export function getRequiredModules(
     const pos: Position = getPosition(node);
     const arg = getArgument(node);
     if (arg === null) {
-      const poi = createPOI('Dynamic Require Arg', file, pos);
+      const poi = createPOI(`${poiTypes.DYNAMIC_ARGUMENT}-require`, file, pos);
       dynamicEvalModules.push(poi);
     } else {
       const poi = createPOI(arg, file, pos);
@@ -250,6 +254,9 @@ export function findModules(
   const modulesFound = getRequiredModules(requireCalls, file, false);
   const requiredModules =
       modulesFound.filter(mod => moduleList.includes(mod.type));
+  requiredModules.map((mod) => {
+    mod.type = `${poiTypes.REQUIRED_MODULE}-${mod.type}`;
+  });
   return requiredModules;
 }
 
@@ -290,7 +297,8 @@ export function locateAliases(
              parent.argument.type === 'Identifier' &&
              parent.argument.name === id)) {
           const pos: Position = getPosition(parent);
-          pois.push(createPOI(`Obfuscated ${id} identifier`, file, pos));
+          pois.push(
+              createPOI(`${poiTypes.VALUE_REASSIGNMENT}-${id}`, file, pos));
         }
       }
     }
@@ -318,7 +326,7 @@ export function locatePropAccessesOfFuncs(
         // Assignment to variable
         if (parent.type === 'MemberExpression' && parent.object === n) {
           const pos: Position = getPosition(parent);
-          pois.push(createPOI(`Access to a property of ${id}`, file, pos));
+          pois.push(createPOI(`${poiTypes.PROPERTY_ACCESS}-${id}`, file, pos));
         }
       }
     }

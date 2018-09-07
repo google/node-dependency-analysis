@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import * as acorn from 'acorn';
 import {Node} from 'estree';
 
 import * as analysisUtil from './analysis-util';
 import {PointOfInterest} from './package-graph';
+import * as poiTypes from './poi-types';
 
 /**
  * Gets a list of PointOfInterest objects, indicating that there were IO
@@ -29,8 +29,9 @@ import {PointOfInterest} from './package-graph';
  */
 export function getIOModules(acornTree: Node, file: string): PointOfInterest[] {
   const ioModuleList: string[] =
-      ['http', 'fs', 'https', 'http2', 'net', 'datagram'];
+      ['http', 'fs', 'https', 'http2', 'net', 'dgram'];
   const found = analysisUtil.findModules(acornTree, file, ioModuleList);
+
   return found;
 }
 
@@ -85,7 +86,8 @@ export function getSyntaxError(contents: string, file: string): PointOfInterest|
     acorn.parse(contents, {allowHashBang: true, locations: true});
   } catch (err) {
     const pos = {lineStart: 0, lineEnd: 0, colStart: 0, colEnd: 0};
-    const syntaxError = analysisUtil.createPOI('Syntax Error', file, pos);
+    const syntaxError = analysisUtil.createPOI(
+        `${poiTypes.UNPROCESSED}-syntaxError`, file, pos);
     return syntaxError;
   }
   return null;
@@ -103,7 +105,7 @@ export function getEvalCalls(acornTree: Node, file: string): PointOfInterest[] {
       analysisUtil.findCallee('eval', acornTree);
   foundStandardEvalCalls.forEach((node) => {
     const evalPOI = analysisUtil.createPOI(
-        'Eval Call', file, analysisUtil.getPosition(node));
+        `${poiTypes.FUNCTION_CALL}-eval`, file, analysisUtil.getPosition(node));
     evalPOIs.push(evalPOI);
   });
 
@@ -145,7 +147,8 @@ export function getFunctionClassAccesses(acornTree: Node, file: string) {
       analysisUtil.findCallee('Function', acornTree);
   functionClassUsages.forEach((node) => {
     const functionClassPOI = analysisUtil.createPOI(
-        'Function constructor usage', file, analysisUtil.getPosition(node));
+        `${poiTypes.FUNCTION_CALL}-Function`, file,
+        analysisUtil.getPosition(node));
     functionClassPOIs.push(functionClassPOI);
   });
 

@@ -17,7 +17,6 @@
 import * as acorn from 'acorn';
 import test from 'ava';
 
-import {file} from 'tmp';
 import * as analysis from '../src/detection-functions';
 
 test(
@@ -27,7 +26,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getIOModules(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'http');
+      t.deepEqual(result[0].type, 'requiredModule-http');
     });
 
 test(
@@ -55,19 +54,19 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getIOModules(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'http');
+      t.deepEqual(result1[0].type, 'requiredModule-http');
 
       const content2 = 'const a = require(`http`);';
       const acornTree2 = parse(content2);
       const result2 = analysis.getIOModules(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'http');
+      t.deepEqual(result2[0].type, 'requiredModule-http');
 
       const content3 = 'a = require("http");';
       const acornTree3 = parse(content3);
       const result3 = analysis.getIOModules(acornTree3, 'file');
       t.deepEqual(result3.length, 1);
-      t.deepEqual(result3[0].type, 'http');
+      t.deepEqual(result3[0].type, 'requiredModule-http');
     });
 
 test('getIOModules should detect both http and fs module', async t => {
@@ -75,8 +74,8 @@ test('getIOModules should detect both http and fs module', async t => {
   const acornTree = parse(content);
   const result = analysis.getIOModules(acornTree, 'file');
   t.deepEqual(result.length, 2);
-  t.deepEqual(result[0].type, 'http');
-  t.deepEqual(result[1].type, 'fs');
+  t.deepEqual(result[0].type, 'requiredModule-http');
+  t.deepEqual(result[1].type, 'requiredModule-fs');
 });
 
 test(
@@ -86,25 +85,25 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getArbitraryExecutionMods(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'child_process');
+      t.deepEqual(result1[0].type, 'requiredModule-child_process');
 
       const content2 = 'const b = require("repl");';
       const acornTree2 = parse(content2);
       const result2 = analysis.getArbitraryExecutionMods(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'repl');
+      t.deepEqual(result2[0].type, 'requiredModule-repl');
 
       const content3 = 'require("vm").runInNewContext("doSomething();")';
       const acornTree3 = parse(content3);
       const result3 = analysis.getArbitraryExecutionMods(acornTree3, 'file');
       t.deepEqual(result3.length, 1);
-      t.deepEqual(result3[0].type, 'vm');
+      t.deepEqual(result3[0].type, 'requiredModule-vm');
 
       const content4 = 'const b = require("module");';
       const acornTree4 = parse(content4);
       const result4 = analysis.getArbitraryExecutionMods(acornTree4, 'file');
       t.deepEqual(result4.length, 1);
-      t.deepEqual(result4[0].type, 'module');
+      t.deepEqual(result4[0].type, 'requiredModule-module');
     });
 
 test(
@@ -115,7 +114,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Dynamic Require Arg');
+      t.deepEqual(result[0].type, 'dynamicArgument-require');
     });
 
 test(
@@ -127,13 +126,13 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.unusualUsesOfRequire(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Dynamic Require Arg');
+      t.deepEqual(result1[0].type, 'dynamicArgument-require');
 
       const content2 = 'const a = require("anotherhttp".substring(6))';
       const acornTree2 = parse(content2);
       const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Dynamic Require Arg');
+      t.deepEqual(result2[0].type, 'dynamicArgument-require');
     });
 
 test(
@@ -145,7 +144,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Dynamic Require Arg');
+      t.deepEqual(result[0].type, 'dynamicArgument-require');
     });
 
 test(
@@ -157,13 +156,13 @@ test(
       const acornTree = parse(content);
       const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-require');
 
       const content2 = 'a = require;';
       const acornTree2 = parse(content2);
       const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result2[0].type, 'valueReassignment-require');
     });
 
 test(
@@ -175,7 +174,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-require');
     });
 
 test(
@@ -187,7 +186,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.unusualUsesOfRequire(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-require');
     });
 
 
@@ -209,13 +208,13 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.unusualUsesOfRequire(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result1[0].type, 'valueReassignment-require');
 
       const content2 = 'r = require + 0;';
       const acornTree2 = parse(content2);
       const result2 = analysis.unusualUsesOfRequire(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Obfuscated require identifier');
+      t.deepEqual(result2[0].type, 'valueReassignment-require');
     });
 
 test(
@@ -225,7 +224,7 @@ test(
       const content = 'const s = "';
       const result = analysis.getSyntaxError(content, 'file');
       t.notDeepEqual(result, null);
-      t.deepEqual(result!.type, 'Syntax Error');
+      t.deepEqual(result!.type, 'unprocessed-syntaxError');
     });
 
 test(
@@ -242,7 +241,7 @@ test('getEvalCalls should return pois for standard eval() usages', async t => {
   const acornTree = parse(content);
   const result = analysis.getEvalCalls(acornTree, 'file');
   t.deepEqual(result.length, 1);
-  t.deepEqual(result[0].type, 'Eval Call');
+  t.deepEqual(result[0].type, 'functionCall-eval');
 });
 
 test(
@@ -252,7 +251,7 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getEvalCalls(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Obfuscated eval identifier');
+      t.deepEqual(result1[0].type, 'valueReassignment-eval');
 
       const content2 =
           'doSomethingBad(eval); function doSomethingBad(something)' +
@@ -260,7 +259,7 @@ test(
       const acornTree2 = parse(content2);
       const result2 = analysis.getEvalCalls(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Obfuscated eval identifier');
+      t.deepEqual(result2[0].type, 'valueReassignment-eval');
     });
 
 test(
@@ -270,7 +269,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getEvalCalls(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Access to a property of eval');
+      t.deepEqual(result[0].type, 'propertyAccess-eval');
     });
 
 test(
@@ -281,14 +280,14 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getEnvAccesses(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Access to process.env');
+      t.deepEqual(result1[0].type, 'specificPropertyAccess-process.env');
 
 
       const content2 = 'const r = process["env"].SOME_TOKEN';
       const acornTree2 = parse(content2);
       const result2 = analysis.getEnvAccesses(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Access to process.env');
+      t.deepEqual(result2[0].type, 'specificPropertyAccess-process.env');
 
       const content3 = 'doBadThings(Object.keys(process["env"]).map' +
           '(k => process["env"][k]));';
@@ -300,7 +299,7 @@ test(
       const acornTree4 = parse(content4);
       const result4 = analysis.getEnvAccesses(acornTree4, 'file');
       t.deepEqual(result4.length, 1);
-      t.deepEqual(result4[0].type, 'Access to process.env');
+      t.deepEqual(result4[0].type, 'specificPropertyAccess-process.env');
     });
 
 test('getEnvAccesses should return pois for obscured properties', async t => {
@@ -308,13 +307,13 @@ test('getEnvAccesses should return pois for obscured properties', async t => {
   const acornTree1 = parse(content1);
   const result1 = analysis.getEnvAccesses(acornTree1, 'file');
   t.deepEqual(result1.length, 1);
-  t.deepEqual(result1[0].type, 'Obscured process property');
+  t.deepEqual(result1[0].type, 'dynamicProperty-process');
 
   const content2 = 'process[`e${middle}v`]';
   const acornTree2 = parse(content2);
   const result2 = analysis.getEnvAccesses(acornTree2, 'file');
   t.deepEqual(result2.length, 1);
-  t.deepEqual(result2[0].type, 'Obscured process property');
+  t.deepEqual(result2[0].type, 'dynamicProperty-process');
 });
 
 test(
@@ -325,7 +324,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getEnvAccesses(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated process identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-process');
     });
 
 test(
@@ -346,19 +345,19 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getAccessesToGlobalProps(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Access to global.Function');
+      t.deepEqual(result1[0].type, 'specificPropertyAccess-global.Function');
 
       const content2 = 'global.require("http");';
       const acornTree2 = parse(content2);
       const result2 = analysis.getAccessesToGlobalProps(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Access to global.require');
+      t.deepEqual(result2[0].type, 'specificPropertyAccess-global.require');
 
       const content3 = 'f = global.eval(doSomethingBad());';
       const acornTree3 = parse(content3);
       const result3 = analysis.getAccessesToGlobalProps(acornTree3, 'file');
       t.deepEqual(result3.length, 1);
-      t.deepEqual(result3[0].type, 'Access to global.eval');
+      t.deepEqual(result3[0].type, 'specificPropertyAccess-global.eval');
     });
 
 test(
@@ -368,7 +367,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getAccessesToGlobalProps(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated global identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-global');
     });
 
 function parse(contents: string) {
@@ -383,13 +382,13 @@ test(
       const acornTree1 = parse(content1);
       const result1 = analysis.getFunctionClassAccesses(acornTree1, 'file');
       t.deepEqual(result1.length, 1);
-      t.deepEqual(result1[0].type, 'Function constructor usage');
+      t.deepEqual(result1[0].type, 'functionCall-Function');
 
       const content2 = 'const a = Function(\'a\', doSomethingBad);';
       const acornTree2 = parse(content2);
       const result2 = analysis.getFunctionClassAccesses(acornTree2, 'file');
       t.deepEqual(result2.length, 1);
-      t.deepEqual(result2[0].type, 'Function constructor usage');
+      t.deepEqual(result2[0].type, 'functionCall-Function');
     });
 
 test(
@@ -400,7 +399,7 @@ test(
       const acornTree = parse(content);
       const result = analysis.getFunctionClassAccesses(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Access to a property of Function');
+      t.deepEqual(result[0].type, 'propertyAccess-Function');
     });
 
 test(
@@ -411,5 +410,5 @@ test(
       const acornTree = parse(content);
       const result = analysis.getFunctionClassAccesses(acornTree, 'file');
       t.deepEqual(result.length, 1);
-      t.deepEqual(result[0].type, 'Obfuscated Function identifier');
+      t.deepEqual(result[0].type, 'valueReassignment-Function');
     });

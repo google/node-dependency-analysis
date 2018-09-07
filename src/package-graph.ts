@@ -19,8 +19,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pify from 'pify';
 
-// import { PackageLockJson, Dependency } from './packageLock.d';
-
 import * as analysis from './detection-functions';
 import * as util from './util';
 
