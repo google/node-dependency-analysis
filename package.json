@@ -1,7 +1,14 @@
 {
-  "name": "node-dependency-analysis",
-  "version": "1.0.0",
-  "description": "",
+  "name": "gnash",
+  "version": "0.1.0",
+  "bin": {
+    "gnash": "index.js"
+  },
+  "files": [
+    "build/src",
+    "index.js"
+  ],
+  "description": "A tool to help you know your dependencies through static analysis",
   "main": "index.js",
   "dependencies": {
     "@types/semver": "^5.5.0",
