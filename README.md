@@ -2,6 +2,10 @@
 
 [![npm version](https://badge.fury.io/js/gnash.svg)](https://badge.fury.io/js/gnash)
 
+> I have 1000 dependencies in my Node project and I don't know what they're doing... how can I know more?
+
+**G**oogle's **N**ode **A**nalysis tool **s**hould **h**elp!
+
 Many Node.js projects have large package dependency trees with total transitive dependencies numbering in the hundreds, written by many authors. This tool helps developers more easily audit these dependencies through static analysis, with a focus on highlighting instances of I/O and dynamic execution, as well as patterns that obfuscate these instances. We operate under the assumption that a small number of modules exhibit these behaviors, and provide a summary of the dependency tree that not only assists developers in auditing their code, but also allows users to compare the sensitive functionality of third-party code across new installations and dependency upgrades at a glance.
 
 ## Detected Patterns
